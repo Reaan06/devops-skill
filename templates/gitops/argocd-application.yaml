@@ -1,0 +1,43 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: backend-api-production
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: backend-api
+    app.kubernetes.io/part-of: core-services
+    environment: production
+  finalizers:
+    # Cascade deletion of cluster resources when Application is deleted from Git
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/my-org/gitops-infrastructure.git
+    targetRevision: main
+    path: environments/production/backend-api
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: production-apps
+  syncPolicy:
+    automated:
+      prune: true     # Automatically prune/delete resources no longer in Git
+      selfHeal: true  # Continuously revert out-of-band manual kubectl edits
+      allowEmpty: false
+    syncOptions:
+      - CreateNamespace=true
+      - PrunePropagationPolicy=foreground
+      - PruneLast=true
+      - ApplyOutOfSyncOnly=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+  ignoreDifferences:
+    # Ignore dynamic replica counts managed by HPA
+    - group: apps
+      kind: Deployment
+      jsonPointers:
+        - /spec/replicas

@@ -1,0 +1,57 @@
+name: Feature or Template Request
+description: Propose a new DevOps template, CI/CD workflow, cloud reference architecture, or enhancement.
+title: "[Feature]: "
+labels: ["enhancement", "proposal"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Have an idea for a new DevOps skill template, Kubernetes blueprint, or CI/CD automation? Let us know below!
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem Statement or Use Case
+      description: What problem or architectural pattern does this feature solve?
+      placeholder: Currently, setting up multi-stage distroless builds for Go requires...
+    validations:
+      required: true
+  - type: textarea
+    id: proposed-solution
+    attributes:
+      label: Proposed Solution & Technical Details
+      description: Describe the template, workflow, or configuration you would like to see added.
+      placeholder: Add a production-ready template in `templates/docker/go-distroless/` including...
+    validations:
+      required: true
+  - type: dropdown
+    id: category
+    attributes:
+      label: DevOps Category
+      description: Select the primary domain for this proposal.
+      options:
+        - Docker & Containerization
+        - Kubernetes & GitOps
+        - Terraform & Infrastructure as Code (IaC)
+        - CI/CD & GitHub Actions
+        - Observability & Monitoring
+        - Security & Hardening
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Considered Alternatives
+      description: Have you considered any alternative tools or patterns? Why is the proposed solution preferred?
+      placeholder: We could also use Alpine, but Debian-slim or Distroless provides better CVE posture because...
+  - type: textarea
+    id: additional-context
+    attributes:
+      label: Additional Context & References
+      description: Add any relevant links to upstream documentation, CVE advisories, or reference architecture benchmarks.
+  - type: checkboxes
+    id: contribution-interest
+    attributes:
+      label: Contribution Willingness
+      options:
+        - label: I am willing to submit a Pull Request to implement this proposal.

@@ -1,0 +1,101 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://gentleman-programming.github.io/devops-skill/schemas/structured-log.json",
+  "title": "CloudNativeStructuredLogEntry",
+  "description": "Production JSON Schema specification for cloud-native single-line structured logging with OpenTelemetry W3C trace context correlation.",
+  "type": "object",
+  "required": [
+    "timestamp",
+    "level",
+    "service",
+    "message"
+  ],
+  "properties": {
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO-8601 UTC timestamp with millisecond precision (e.g. 2026-03-30T14:32:01.124Z)."
+    },
+    "level": {
+      "type": "string",
+      "enum": ["TRACE", "DEBUG", "INFO", "WARN", "ERROR", "FATAL"],
+      "description": "Normalized syslog severity level."
+    },
+    "service": {
+      "type": "string",
+      "pattern": "^[a-z0-9-]+$",
+      "description": "Microservice identifier matching telemetry resource.service.name."
+    },
+    "version": {
+      "type": "string",
+      "description": "Semantic release version or commit SHA of running application."
+    },
+    "environment": {
+      "type": "string",
+      "enum": ["dev", "staging", "production"],
+      "description": "Deployment environment tier."
+    },
+    "message": {
+      "type": "string",
+      "description": "Human-readable log narrative without embedded unescaped newlines."
+    },
+    "trace_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{32}$",
+      "description": "W3C Trace ID (16-byte hex string) correlating the log entry to an active distributed trace."
+    },
+    "span_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{16}$",
+      "description": "W3C Span ID (8-byte hex string) representing the active execution span."
+    },
+    "trace_flags": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{2}$",
+      "description": "W3C Trace Flags (e.g. 01 for sampled traces)."
+    },
+    "http": {
+      "type": "object",
+      "properties": {
+        "method": {
+          "type": "string",
+          "enum": ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"]
+        },
+        "route": {
+          "type": "string",
+          "description": "Parameterized HTTP route template (e.g. /api/v1/users/{id})."
+        },
+        "status_code": {
+          "type": "integer",
+          "minimum": 100,
+          "maximum": 599
+        },
+        "duration_ms": {
+          "type": "number",
+          "minimum": 0
+        },
+        "client_ip": {
+          "type": "string"
+        }
+      }
+    },
+    "error": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "description": "Error class or exception type name."
+        },
+        "message": {
+          "type": "string",
+          "description": "Error description."
+        },
+        "stack_trace": {
+          "type": "string",
+          "description": "Sanitized stack trace."
+        }
+      }
+    }
+  },
+  "additionalProperties": true
+}

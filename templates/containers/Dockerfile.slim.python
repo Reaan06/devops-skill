@@ -1,0 +1,60 @@
+# syntax=docker/dockerfile:1.7
+# ==============================================================================
+# Production Debian Slim Multi-Stage Dockerfile for Python
+# - Multi-stage isolation: virtualenv build stage -> clean runtime stage
+# - Virtualenv isolation in /opt/venv (no compilers or header files in runtime)
+# - BuildKit pip cache mounts for rapid rebuilds
+# - Unprivileged non-root user (UID 10001 appuser)
+# - Zero COW layer bloat (--chown applied on transfer)
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# Stage 1: Build virtual environment and compile C-extensions
+# ------------------------------------------------------------------------------
+FROM python:3.12-slim-bookworm AS builder
+
+WORKDIR /build
+
+# Install build-essential only in builder stage if C extensions are required
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    ca-certificates \
+ && rm -rf /var/lib/apt/lists/*
+
+# Create isolated virtual environment
+RUN python -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
+# Install dependencies into virtualenv using BuildKit cache mount
+COPY requirements.txt .
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install --no-compile --upgrade pip setuptools wheel && \
+    pip install --no-compile -r requirements.txt
+
+# ------------------------------------------------------------------------------
+# Stage 2: Hardened unprivileged runtime stage
+# ------------------------------------------------------------------------------
+FROM python:3.12-slim-bookworm AS runner
+
+WORKDIR /app
+
+# Enforce secure and predictable Python runtime behavior
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PATH="/opt/venv/bin:$PATH"
+
+# Create explicit unprivileged user and group (UID/GID 10001)
+RUN groupadd -g 10001 appgroup && \
+    useradd -u 10001 -g appgroup -s /sbin/nologin -M appuser
+
+# Copy virtualenv and application source with appuser ownership
+COPY --chown=appuser:appgroup --from=builder /opt/venv /opt/venv
+COPY --chown=appuser:appgroup . /app
+
+# Switch to unprivileged user
+USER appuser
+
+EXPOSE 8000
+
+# Run WSGI/ASGI application (e.g. uvicorn, gunicorn)
+ENTRYPOINT ["python", "-m", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]

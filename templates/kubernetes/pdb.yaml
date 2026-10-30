@@ -1,0 +1,15 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: backend-api-pdb
+  namespace: production-apps
+  labels:
+    app.kubernetes.io/name: backend-api
+    app.kubernetes.io/instance: production
+    app.kubernetes.io/managed-by: argocd
+spec:
+  # Ensure at least 2 replicas remain operational during node drains or maintenance
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: backend-api

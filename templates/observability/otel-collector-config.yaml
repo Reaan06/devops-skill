@@ -1,0 +1,98 @@
+# ==============================================================================
+# OpenTelemetry Collector v1.30+ Production Configuration
+# - OTLP ingestion over gRPC (4317) and HTTP (4318)
+# - Memory limiter and batch processors to safeguard collector stability
+# - Trace export to Grafana Tempo / Jaeger via OTLP
+# - Metric export via Prometheus scrape exporter (8889)
+# - Log export with trace context correlation to Grafana Loki
+# ==============================================================================
+
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+  prometheus:
+    config:
+      scrape_configs:
+        - job_name: "otel-collector"
+          scrape_interval: 15s
+          static_configs:
+            - targets: ["0.0.0.0:8888"]
+
+processors:
+  # Prevent OOM kills by dropping or throttling batches before hitting host limit
+  memory_limiter:
+    check_interval: 1s
+    limit_percentage: 75
+    spike_limit_percentage: 20
+
+  batch:
+    timeout: 1s
+    send_batch_size: 1024
+    send_batch_max_size: 2048
+
+  # Strip or redact sensitive authorization tokens from span attributes
+  transform/traces:
+    trace_statements:
+      - context: span
+        statements:
+          - delete_key(attributes, "http.request.header.authorization")
+          - delete_key(attributes, "http.request.header.cookie")
+
+  # Inject deployment environment attributes
+  resource:
+    attributes:
+      - key: deployment.environment
+        value: "production"
+        action: insert
+
+exporters:
+  # Distributed Traces -> Tempo / Jaeger
+  otlp/tempo:
+    endpoint: tempo-distributor.monitoring.svc.cluster.local:4317
+    tls:
+      insecure: true
+
+  # Metrics -> Prometheus Scraping Endpoint
+  prometheus:
+    endpoint: 0.0.0.0:8889
+    namespace: otel
+    send_timestamps: true
+
+  # Logs -> Grafana Loki via OTLP HTTP
+  otlphttp/loki:
+    endpoint: http://loki-gateway.monitoring.svc.cluster.local:3100/otlp
+    tls:
+      insecure: true
+
+extensions:
+  health_check:
+    endpoint: 0.0.0.0:13133
+  zpages:
+    endpoint: 0.0.0.0:55679
+
+service:
+  extensions: [health_check, zpages]
+  telemetry:
+    logs:
+      level: info
+    metrics:
+      address: 0.0.0.0:8888
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, transform/traces, resource, batch]
+      exporters: [otlp/tempo]
+
+    metrics:
+      receivers: [otlp, prometheus]
+      processors: [memory_limiter, resource, batch]
+      exporters: [prometheus]
+
+    logs:
+      receivers: [otlp]
+      processors: [memory_limiter, resource, batch]
+      exporters: [otlphttp/loki]

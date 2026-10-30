@@ -1,0 +1,47 @@
+name: AWS Authentication via OpenID Connect (OIDC)
+
+on:
+  workflow_call:
+    inputs:
+      aws-region:
+        description: "Target AWS deployment region"
+        required: false
+        type: string
+        default: "us-east-1"
+      role-to-assume:
+        description: "ARN of the IAM Role to assume via OIDC"
+        required: true
+        type: string
+    outputs:
+      account-id:
+        description: "Authenticated AWS Account ID"
+        value: ${{ jobs.authenticate.outputs.account-id }}
+
+permissions:
+  id-token: write # Mandatory for requesting the ephemeral JWT token from GitHub OIDC IdP
+  contents: read
+
+jobs:
+  authenticate:
+    name: OIDC Federated Authentication
+    runs-on: ubuntu-latest
+    outputs:
+      account-id: ${{ steps.caller-identity.outputs.account }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials via OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ inputs.role-to-assume }}
+          aws-region: ${{ inputs.aws-region }}
+          audience: sts.amazonaws.com
+
+      - name: Verify STS Caller Identity
+        id: caller-identity
+        run: |
+          ACCOUNT_ID=$(aws sts get-caller-identity --query "Account" --output text)
+          echo "account=${ACCOUNT_ID}" >> "$GITHUB_OUTPUT"
+          echo "Successfully authenticated to AWS Account: ${ACCOUNT_ID} using short-lived OIDC session."

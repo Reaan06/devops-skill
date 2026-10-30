@@ -1,0 +1,60 @@
+# syntax=docker/dockerfile:1.7
+# ==============================================================================
+# Production Debian Slim Multi-Stage Dockerfile for Node.js
+# - Multi-stage isolation: dependencies -> build -> unprivileged runtime
+# - BuildKit package manager cache mounts
+# - Zero Copy-on-Write duplicate layer bloat (--chown at transfer time)
+# - Process signal handling via dumb-init
+# - Production-hardened unprivileged user (UID 1000 node)
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# Stage 1: Dependency resolution and compilation
+# ------------------------------------------------------------------------------
+FROM node:22-bookworm-slim AS builder
+
+WORKDIR /app
+
+# Install build dependencies if needed (purged automatically in final stage)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates \
+ && rm -rf /var/lib/apt/lists/*
+
+# Install dependencies using npm cache mount
+COPY package.json package-lock.json ./
+RUN --mount=type=cache,target=/root/.npm \
+    npm ci --include=dev
+
+# Copy application source and build production bundle
+COPY . .
+RUN npm run build && npm prune --omit=dev
+
+# ------------------------------------------------------------------------------
+# Stage 2: Hardened unprivileged runtime
+# ------------------------------------------------------------------------------
+FROM node:22-bookworm-slim AS runner
+
+WORKDIR /app
+
+# Install lightweight init system for proper PID 1 signal forwarding
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    dumb-init \
+ && apt-get clean \
+ && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+
+ENV NODE_ENV=production
+ENV PORT=3000
+
+# Copy node_modules and built artifacts with non-root ownership (UID 1000 node)
+COPY --chown=node:node --from=builder /app/node_modules ./node_modules
+COPY --chown=node:node --from=builder /app/package.json ./package.json
+COPY --chown=node:node --from=builder /app/dist ./dist
+
+# Enforce non-root execution
+USER node
+
+EXPOSE 3000
+
+# Use dumb-init to handle SIGINT/SIGTERM properly
+ENTRYPOINT ["/usr/bin/dumb-init", "--"]
+CMD ["node", "dist/index.js"]

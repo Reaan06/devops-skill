@@ -1,0 +1,65 @@
+name: Bug Report
+description: Report a bug, broken template, or unexpected behavior in devops-skill.
+title: "[Bug]: "
+labels: ["bug", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for reporting an issue! Please ensure that you do not include any confidential data, real API keys, or production credentials in this report.
+  - type: textarea
+    id: description
+    attributes:
+      label: Bug Description
+      description: Provide a clear and concise description of what the problem is.
+      placeholder: Describe what happened and what you expected instead...
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment & Tool Versions
+      description: List the relevant versions of tools and runtimes used when this bug occurred.
+      value: |
+        - OS / Architecture: (e.g., Ubuntu 24.04 x86_64, macOS Darwin arm64)
+        - Docker / Engine Version:
+        - Kubernetes / Kubectl Version:
+        - Terraform / OpenTofu Version:
+        - Helm / Kustomize Version:
+        - Node / Python / Go Version:
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to Reproduce
+      description: Provide the exact steps or commands to reproduce the issue.
+      placeholder: |
+        1. Run command '...'
+        2. Apply manifest '...'
+        3. See error '...'
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Behavior
+      description: What did you expect to happen?
+      placeholder: The container should start cleanly under non-root UID...
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant Logs & Output
+      description: Paste relevant terminal logs or error messages here. Ensure all secrets, tokens, IPs, and private domains are redacted!
+      render: shell
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Security & Submission Sanity Check
+      options:
+        - label: I confirm that no secrets, passwords, private keys, or API tokens are contained in this issue.
+          required: true
+        - label: I have searched existing issues to ensure this bug has not already been reported.
+          required: true

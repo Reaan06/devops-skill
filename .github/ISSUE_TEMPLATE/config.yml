@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security Vulnerability Report
+    url: https://github.com/Gentleman-Programming/devops-skill/security/advisories/new
+    about: Report security issues privately through Coordinated Vulnerability Disclosure (or email esteban0609ye@gmail.com).
+  - name: Community Discussions & Q&A
+    url: https://github.com/Gentleman-Programming/devops-skill/discussions
+    about: Ask questions, explore architecture ideas, and collaborate with other DevOps engineers.

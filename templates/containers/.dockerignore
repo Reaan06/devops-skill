@@ -1,0 +1,91 @@
+# ==============================================================================
+# Exhaustive Production .dockerignore
+# Prevents context bloat, credential leaks, and cache invalidation
+# ==============================================================================
+
+# Version control & harness artifacts
+.git
+.gitignore
+.gitattributes
+.github
+.agent
+.pi
+
+# Secret stores, keys, and environment variables
+.env
+.env.*
+*.env
+*.pem
+*.key
+*.pkcs12
+*.pfx
+*.crt
+id_rsa
+id_ed25519
+secrets/
+credentials.json
+
+# Local dependency caches & virtual environments
+node_modules
+.pnpm-store
+.npm
+.yarn
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+.venv
+venv/
+ENV/
+env/
+.tox/
+vendor/
+
+# Compiler outputs & build artifacts
+dist/
+build/
+bin/
+obj/
+out/
+target/
+*.o
+*.a
+*.so
+*.dylib
+*.exe
+
+# Test runners & coverage reports
+tests/
+test/
+spec/
+coverage/
+.nyc_output/
+.pytest_cache/
+.coverage
+*.lcov
+htmlcov/
+
+# Infrastructure state & local manifests
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+*.tfvars.json
+
+# IDE, OS, and local developer files
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Documentation & design artifacts
+README.md
+CHANGELOG.md
+CONTRIBUTING.md
+docs/
+design/
+references/

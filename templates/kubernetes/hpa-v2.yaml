@@ -1,0 +1,57 @@
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: backend-api-hpa
+  namespace: production-apps
+  labels:
+    app.kubernetes.io/name: backend-api
+    app.kubernetes.io/instance: production
+    app.kubernetes.io/managed-by: argocd
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: backend-api
+  minReplicas: 3
+  maxReplicas: 15
+  metrics:
+    # Scale on CPU resource utilization
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+    # Scale on Memory resource utilization
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 80
+    # Scale on custom HTTP request rate from Prometheus metrics adapter
+    - type: Pods
+      pods:
+        metric:
+          name: http_requests_per_second
+        target:
+          type: AverageValue
+          averageValue: "150"
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 0 # Immediate scale up on traffic bursts
+      policies:
+        - type: Percent
+          value: 100 # Double replica count every 15 seconds if needed
+          periodSeconds: 15
+        - type: Pods
+          value: 4 # Or add at least 4 pods
+          periodSeconds: 15
+      selectPolicy: Max
+    scaleDown:
+      stabilizationWindowSeconds: 300 # 5-minute cool down window to prevent flapping
+      policies:
+        - type: Percent
+          value: 10 # Scale down at most 10% of pods per minute
+          periodSeconds: 60
+      selectPolicy: Min

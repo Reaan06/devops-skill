@@ -5,7 +5,7 @@
 High-performing infrastructure and DevOps projects require consistent engineering discipline, clear contribution pathways, and predictable release management. An open-source or enterprise infrastructure repository must establish:
 
 1. **Structured Documentation Architecture**: Structuring technical prose following the **Diátaxis framework** (Tutorials, How-To Guides, Reference, Explanation).
-2. **Standard Repository Invariants**: Explicit `LICENSE`, `SECURITY.md`, `CONTRIBUTING.md`, and `CODE_OF_CONDUCT.md`.
+2. **Standard Repository Invariants**: Explicit `LICENSE` (MIT License), `SECURITY.md`, `CONTRIBUTING.md`, and `CODE_OF_CONDUCT.md`.
 3. **Pull Request Hygiene & Etiquette**: Scoped atomic commits, semantic versioning, self-describing PR descriptions, and zero-breaking-change contracts.
 4. **Automated Quality Gates**: Shift-left continuous integration enforcing linters (`yamllint`, `markdownlint`, `actionlint`), formatters, and security checks on every pull request.
 

@@ -1,6 +1,6 @@
 # DevOps & DevSecOps Engineering Skill
 
-[![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![CI](https://github.com/gentleman-programming/devops-skill/actions/workflows/ci.yml/badge.svg)](https://github.com/gentleman-programming/devops-skill/actions/workflows/ci.yml)
 [![Security Scan](https://github.com/gentleman-programming/devops-skill/actions/workflows/security-scan.yml/badge.svg)](https://github.com/gentleman-programming/devops-skill/actions/workflows/security-scan.yml)
 [![DevSecOps Trivy](https://img.shields.io/badge/Security-Trivy%20Gated-brightgreen.svg)](https://trivy.dev/)
@@ -31,7 +31,7 @@ Production-grade 2025/2026 DevOps and DevSecOps engineering skill for cloud-nati
 devops-skill/
 ├── SKILL.md                          # Main skill specification & agent execution contract
 ├── README.md                         # Project documentation and onboarding
-├── LICENSE                           # Apache-2.0 open-source license
+├── LICENSE                           # MIT open-source license
 ├── SECURITY.md                       # Vulnerability disclosure and security policy
 ├── CONTRIBUTING.md                   # Engineering standards, linting, and PR workflow
 ├── CODE_OF_CONDUCT.md                # Community covenant code of conduct
@@ -142,4 +142,4 @@ We welcome community contributions! Please review our guidelines:
 
 ## License
 
-This project is licensed under the [Apache License, Version 2.0](LICENSE).
+This project is licensed under the [MIT License](LICENSE).

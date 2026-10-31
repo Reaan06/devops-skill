@@ -1,0 +1,99 @@
+# ==============================================================================
+# Kubernetes Gateway API (gateway.networking.k8s.io/v1)
+# Modern declarative ingress routing with Layer 7 filtering and TLS termination
+# ==============================================================================
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: enterprise-gateway
+  namespace: production-apps
+  labels:
+    app.kubernetes.io/name: enterprise-gateway
+    app.kubernetes.io/part-of: core-platform
+spec:
+  # The GatewayClass managed by the underlying controller (e.g. Envoy Gateway, Cilium, Istio)
+  gatewayClassName: envoy-gateway
+  listeners:
+    # HTTP Listener for redirect or direct routing
+    - name: http
+      protocol: HTTP
+      port: 80
+      allowedRoutes:
+        namespaces:
+          from: Same
+
+    # HTTPS Listener with TLS Termination and Certificate Reference
+    - name: https
+      protocol: HTTPS
+      port: 443
+      hostname: "api.example.com"
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - kind: Secret
+            name: api-tls-cert
+      allowedRoutes:
+        namespaces:
+          from: Same
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: http-to-https-redirect
+  namespace: production-apps
+  labels:
+    app.kubernetes.io/name: enterprise-gateway
+spec:
+  parentRefs:
+    - name: enterprise-gateway
+      sectionName: http
+  rules:
+    - filters:
+        - type: RequestRedirect
+          requestRedirect:
+            scheme: https
+            statusCode: 301
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: backend-api-route
+  namespace: production-apps
+  labels:
+    app.kubernetes.io/name: backend-api
+    app.kubernetes.io/part-of: core-platform
+spec:
+  parentRefs:
+    - name: enterprise-gateway
+      sectionName: https
+  hostnames:
+    - "api.example.com"
+  rules:
+    # Rule 1: Production API traffic with header modification filter
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /api/v1
+      filters:
+        - type: RequestHeaderModifier
+          requestHeaderModifier:
+            set:
+              - name: X-Gateway-Routed
+                value: "true"
+              - name: X-Forwarded-Proto
+                value: "https"
+      backendRefs:
+        - name: backend-api
+          port: 80
+          weight: 100
+
+    # Rule 2: Public health check endpoint
+    - matches:
+        - path:
+            type: Exact
+            value: /healthz
+      backendRefs:
+        - name: backend-api
+          port: 80
+          weight: 100

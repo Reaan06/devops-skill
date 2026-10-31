@@ -1,0 +1,201 @@
+# ==============================================================================
+# Hardened Enterprise Harbor Helm Values (High Availability & Zero-Trust)
+# Architecture: Stateless Replicas, S3 Distributed Storage, External PostgreSQL & Redis
+# Security: PSS Restricted, TLS Termination, Automated Trivy Scanner, Cosign Gates
+# ==============================================================================
+
+expose:
+  type: ingress
+  tls:
+    enabled: true
+    certSource: secret
+    secret:
+      secretName: harbor-tls-certificate
+  ingress:
+    hosts:
+      core: registry.infra.example.com
+      notary: notary.infra.example.com
+    className: nginx
+    annotations:
+      cert-manager.io/cluster-issuer: letsencrypt-production
+      nginx.ingress.kubernetes.io/proxy-body-size: "0"
+      nginx.ingress.kubernetes.io/proxy-read-timeout: "900"
+      nginx.ingress.kubernetes.io/proxy-send-timeout: "900"
+      nginx.ingress.kubernetes.io/ssl-redirect: "true"
+
+externalURL: https://registry.infra.example.com
+
+# ------------------------------------------------------------------------------
+# Storage Engine: Distributed AWS S3 / MinIO (Decoupled from Node Disks)
+# ------------------------------------------------------------------------------
+persistence:
+  enabled: false
+  resourcePolicy: keep
+  imageChartStorage:
+    type: s3
+    s3:
+      region: us-east-1
+      bucket: enterprise-harbor-registry-prod
+      encrypt: true
+      secure: true
+      v4auth: true
+      existingSecret: harbor-s3-credentials
+
+# ------------------------------------------------------------------------------
+# Persistence Backend: External High-Availability Managed PostgreSQL
+# ------------------------------------------------------------------------------
+database:
+  type: external
+  external:
+    host: rds-postgres-ha.infra.example.com
+    port: "5432"
+    username: harbor_master
+    sslmode: verify-full
+    coreDatabase: harbor_core
+    existingSecret: harbor-postgresql-secret
+
+# ------------------------------------------------------------------------------
+# Cache & Session Backend: External Clustered Redis
+# ------------------------------------------------------------------------------
+redis:
+  type: external
+  external:
+    addr: redis-ha.infra.example.com:6379
+    existingSecret: harbor-redis-secret
+
+# ------------------------------------------------------------------------------
+# Harbor Core Service (Stateless API & Policy Engine)
+# ------------------------------------------------------------------------------
+core:
+  replicas: 3
+  podAntiAffinity:
+    type: hard
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 10000
+    fsGroup: 10000
+    seccompProfile:
+      type: RuntimeDefault
+  containerSecurityContext:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
+    capabilities:
+      drop:
+        - ALL
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+    limits:
+      cpu: 1000m
+      memory: 2Gi
+  autoscaling:
+    enabled: true
+    minReplicas: 3
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 75
+
+# ------------------------------------------------------------------------------
+# OCI Registry Engine (Stateless Pull/Push Handler)
+# ------------------------------------------------------------------------------
+registry:
+  replicas: 3
+  podAntiAffinity:
+    type: hard
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 10000
+    fsGroup: 10000
+    seccompProfile:
+      type: RuntimeDefault
+  containerSecurityContext:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: false
+    capabilities:
+      drop:
+        - ALL
+  resources:
+    requests:
+      cpu: 1000m
+      memory: 2Gi
+    limits:
+      cpu: 2000m
+      memory: 4Gi
+  middleware:
+    enabled: true
+    type: cloudFront
+
+# ------------------------------------------------------------------------------
+# Portal (Web UI & Audit Dashboard)
+# ------------------------------------------------------------------------------
+portal:
+  replicas: 2
+  podAntiAffinity:
+    type: soft
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 10000
+    fsGroup: 10000
+    seccompProfile:
+      type: RuntimeDefault
+  containerSecurityContext:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
+    capabilities:
+      drop:
+        - ALL
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 250m
+      memory: 256Mi
+
+# ------------------------------------------------------------------------------
+# Trivy Vulnerability & SBOM Scanner Integration
+# ------------------------------------------------------------------------------
+trivy:
+  enabled: true
+  replicas: 2
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 10000
+    fsGroup: 10000
+    seccompProfile:
+      type: RuntimeDefault
+  containerSecurityContext:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: false
+    capabilities:
+      drop:
+        - ALL
+  resources:
+    requests:
+      cpu: 1000m
+      memory: 2Gi
+    limits:
+      cpu: 2000m
+      memory: 4Gi
+  githubToken: ""
+  skipUpdate: false
+  offlineScan: false
+  vulnType: "os,library"
+  severity: "UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL"
+  ignoreUnfixed: false
+
+# ------------------------------------------------------------------------------
+# Metrics & Observability (Prometheus Exporter)
+# ------------------------------------------------------------------------------
+metrics:
+  enabled: true
+  core:
+    path: /metrics
+    port: 8001
+  registry:
+    path: /metrics
+    port: 8001
+  serviceMonitor:
+    enabled: true
+    additionalLabels:
+      release: prometheus-stack

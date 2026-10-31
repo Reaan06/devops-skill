@@ -1,0 +1,58 @@
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: backend-api-l7-policy
+  namespace: production-apps
+  labels:
+    app.kubernetes.io/name: backend-api
+    app.kubernetes.io/instance: production
+    app.kubernetes.io/part-of: core-platform
+    app.kubernetes.io/component: network-security
+    app.kubernetes.io/managed-by: cilium
+spec:
+  description: "Enforces strict L7 HTTP ingress filtering and L4 database/DNS egress for backend-api"
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: backend-api
+  ingress:
+    # Allow incoming traffic only from authorized API Gateway pods on HTTP port 8080 with strict L7 path/method filtering
+    - fromEndpoints:
+        - matchLabels:
+            app.kubernetes.io/name: api-gateway
+            app.kubernetes.io/instance: production
+      toPorts:
+        - ports:
+            - port: "8080"
+              protocol: TCP
+          rules:
+            http:
+              - method: GET
+                path: "/healthz$"
+              - method: GET
+                path: "/api/v1/users(/.*)?$"
+              - method: POST
+                path: "/api/v1/orders$"
+                headers:
+                  - "Content-Type: application/json.*"
+  egress:
+    # Restrict egress strictly to internal PostgreSQL instance on port 5432
+    - toEndpoints:
+        - matchLabels:
+            app.kubernetes.io/name: postgresql
+            app.kubernetes.io/part-of: core-platform
+      toPorts:
+        - ports:
+            - port: "5432"
+              protocol: TCP
+    # Permit cluster DNS resolution over UDP/TCP port 53 via CoreDNS
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: kube-system
+            k8s-app: kube-dns
+      toPorts:
+        - ports:
+            - port: "53"
+              protocol: ANY
+          rules:
+            dns:
+              - matchPattern: "*"

@@ -1,0 +1,74 @@
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: backend-api-autoscaler
+  namespace: production-apps
+  labels:
+    app.kubernetes.io/name: backend-api
+    app.kubernetes.io/instance: production
+    app.kubernetes.io/part-of: core-platform
+    app.kubernetes.io/component: autoscaler
+    app.kubernetes.io/managed-by: keda
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: backend-api
+  minReplicaCount: 0
+  maxReplicaCount: 30
+  pollingInterval: 15
+  cooldownPeriod: 300
+  idleReplicaCount: 0
+  fallback:
+    failureThreshold: 3
+    replicas: 5
+  advanced:
+    restoreToOriginalReplicaCount: false
+    horizontalPodAutoscalerConfig:
+      name: keda-hpa-backend-api
+      behavior:
+        scaleUp:
+          stabilizationWindowSeconds: 0
+          selectPolicy: Max
+          policies:
+            - type: Percent
+              value: 100
+              periodSeconds: 15
+            - type: Pods
+              value: 4
+              periodSeconds: 15
+        scaleDown:
+          stabilizationWindowSeconds: 300
+          selectPolicy: Min
+          policies:
+            - type: Percent
+              value: 10
+              periodSeconds: 60
+            - type: Pods
+              value: 1
+              periodSeconds: 60
+  triggers:
+    - type: prometheus
+      metadata:
+        serverAddress: http://prometheus-k8s.monitoring.svc.cluster.local:9090
+        metricName: http_requests_per_second
+        query: sum(rate(http_requests_total{job="backend-api",namespace="production-apps",status!~"5.*"}[2m]))
+        threshold: "100"
+        activationThreshold: "1"
+      authenticationRef:
+        name: keda-prometheus-trigger-auth
+---
+apiVersion: keda.sh/v1alpha1
+kind: TriggerAuthentication
+metadata:
+  name: keda-prometheus-trigger-auth
+  namespace: production-apps
+  labels:
+    app.kubernetes.io/name: backend-api
+    app.kubernetes.io/component: autoscaler-auth
+    app.kubernetes.io/managed-by: keda
+spec:
+  secretTargetRef:
+    - parameter: bearerToken
+      name: prometheus-k8s-token
+      key: token

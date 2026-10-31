@@ -1,0 +1,71 @@
+# syntax=docker/dockerfile:1.7
+# ==============================================================================
+# Production Distroless Multi-Stage Dockerfile for Rust
+# - cargo-chef pattern: isolates dependency compilation into a reusable recipe,
+#   preventing cache invalidation of third-party crates on application code edits
+# - Statically linked binary compiled against musl libc (x86_64-unknown-linux-musl)
+# - Distroless static runtime: zero shell, zero package manager, zero glibc CVEs
+# - Unprivileged execution via nonroot user (UID 65532, GID 65532)
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# Base toolchain stage: cargo-chef with musl cross-compilation target
+# ------------------------------------------------------------------------------
+FROM lukemathwalker/cargo-chef:latest-rust-1.85-bookworm AS chef
+
+WORKDIR /app
+
+# Add musl target and required host toolchain for static linking
+# hadolint ignore=DL3008
+RUN rustup target add x86_64-unknown-linux-musl && \
+    apt-get update && apt-get install -y --no-install-recommends \
+        musl-tools \
+        musl-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# ------------------------------------------------------------------------------
+# Stage 1: Planner - extracts dependency tree into recipe.json
+# ------------------------------------------------------------------------------
+FROM chef AS planner
+
+COPY . .
+RUN cargo chef prepare --recipe-path recipe.json
+
+# ------------------------------------------------------------------------------
+# Stage 2: Builder - compiles dependencies, then compiles application source
+# ------------------------------------------------------------------------------
+FROM chef AS builder
+
+# Copy skeleton recipe and compile external crate dependencies.
+# This heavy compilation step is fully cached unless Cargo.toml or Cargo.lock changes.
+COPY --from=planner /app/recipe.json recipe.json
+RUN --mount=type=cache,target=/usr/local/cargo/registry \
+    --mount=type=cache,target=/usr/local/cargo/git \
+    cargo chef cook --release --target x86_64-unknown-linux-musl --recipe-path recipe.json
+
+# Copy full application source tree
+COPY . .
+
+# Compile static release binary with stripped debug symbols and size optimizations
+RUN --mount=type=cache,target=/usr/local/cargo/registry \
+    --mount=type=cache,target=/usr/local/cargo/git \
+    cargo build --release --target x86_64-unknown-linux-musl && \
+    strip /app/target/x86_64-unknown-linux-musl/release/app -o /app/server
+
+# ------------------------------------------------------------------------------
+# Stage 3: Runtime - minimal static distroless
+# ------------------------------------------------------------------------------
+FROM gcr.io/distroless/static-debian12:nonroot AS runtime
+
+WORKDIR /app
+
+# Copy statically linked binary directly with nonroot ownership
+COPY --chown=nonroot:nonroot --from=builder /app/server /app/server
+
+# Enforce non-root execution (UID 65532: nonroot)
+# hadolint ignore=DL3066
+USER nonroot:nonroot
+
+EXPOSE 8080
+
+ENTRYPOINT ["/app/server"]

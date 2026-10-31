@@ -1,0 +1,94 @@
+# ==============================================================================
+# OPA Gatekeeper: Non-Root Container Enforcement
+# 1. ConstraintTemplate defining Rego validation logic
+# 2. Constraint binding policy to Pod workloads with admission rejection
+# ==============================================================================
+apiVersion: templates.gatekeeper.sh/v1
+kind: ConstraintTemplate
+metadata:
+  name: k8scontainernonroot
+  annotations:
+    metadata.gatekeeper.sh/title: "Require Non-Root User Execution"
+    metadata.gatekeeper.sh/version: "1.0.0"
+    description: "Requires containers to run as non-root users (runAsNonRoot: true and runAsUser > 0)."
+spec:
+  crd:
+    spec:
+      names:
+        kind: K8sContainerNonRoot
+      validation:
+        openAPIV3Schema:
+          type: object
+          description: "Parameters for non-root container validation."
+          properties:
+            exemptContainerImages:
+              type: array
+              description: "List of container image prefixes exempt from non-root validation."
+              items:
+                type: string
+  targets:
+    - target: admission.k8s.gatekeeper.sh
+      rego: |
+        package k8scontainernonroot
+
+        # Inspect all containers, initContainers, and ephemeralContainers
+        get_containers(pod) = all_containers {
+          containers := object.get(pod.spec, "containers", [])
+          init_containers := object.get(pod.spec, "initContainers", [])
+          ephemeral_containers := object.get(pod.spec, "ephemeralContainers", [])
+          all_containers := array.concat(containers, array.concat(init_containers, ephemeral_containers))
+        }
+
+        # Check if container image is in the exemption list
+        is_exempt(container, params) {
+          exempt_images := object.get(params, "exemptContainerImages", [])
+          some image in exempt_images
+          startswith(container.image, image)
+        }
+
+        # Evaluate violations on Pod-level or Container-level securityContext
+        violation[{"msg": msg}] {
+          container := get_containers(input.review.object)[_]
+          not is_exempt(container, input.parameters)
+
+          # Determine effective runAsNonRoot and runAsUser
+          pod_sc := object.get(input.review.object.spec, "securityContext", {})
+          ctr_sc := object.get(container, "securityContext", {})
+
+          # Effective runAsNonRoot must be true
+          effective_run_as_non_root := object.get(ctr_sc, "runAsNonRoot", object.get(pod_sc, "runAsNonRoot", false))
+          not effective_run_as_non_root
+
+          msg := sprintf("Container '%v' in pod '%v' must set securityContext.runAsNonRoot: true", [container.name, input.review.object.metadata.name])
+        }
+
+        violation[{"msg": msg}] {
+          container := get_containers(input.review.object)[_]
+          not is_exempt(container, input.parameters)
+
+          pod_sc := object.get(input.review.object.spec, "securityContext", {})
+          ctr_sc := object.get(container, "securityContext", {})
+
+          # Effective runAsUser must not be 0 (root)
+          effective_run_as_user := object.get(ctr_sc, "runAsUser", object.get(pod_sc, "runAsUser", 10001))
+          effective_run_as_user == 0
+
+          msg := sprintf("Container '%v' in pod '%v' is configured to run as root (runAsUser: 0)", [container.name, input.review.object.metadata.name])
+        }
+---
+apiVersion: constraints.gatekeeper.sh/v1beta1
+kind: K8sContainerNonRoot
+metadata:
+  name: require-container-nonroot
+spec:
+  enforcementAction: deny
+  match:
+    kinds:
+      - apiGroups: [""]
+        kinds: ["Pod"]
+    excludedNamespaces:
+      - kube-system
+      - gatekeeper-system
+      - cert-manager
+  parameters:
+    exemptContainerImages: []

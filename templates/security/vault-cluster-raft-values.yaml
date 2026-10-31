@@ -1,0 +1,136 @@
+# ==============================================================================
+# HashiCorp Vault Helm Values - High Availability (HA) with Integrated Raft
+# Features:
+# - Integrated Raft Storage (3 replicas, zero external datastore dependency)
+# - End-to-end TLS 1.3 encryption for Client & Raft Cluster peering
+# - Automated Cloud KMS unseal configuration
+# - Pod Disruption Budget, Anti-affinity, and Non-Root Security Contexts
+# ==============================================================================
+
+global:
+  enabled: true
+  tlsDisable: false
+
+injector:
+  enabled: true
+  replicas: 2
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "128Mi"
+    limits:
+      cpu: "250m"
+      memory: "256Mi"
+
+server:
+  image:
+    repository: "hashicorp/vault"
+    tag: "1.18.2"
+    pullPolicy: "IfNotPresent"
+
+  # Run in High Availability mode
+  ha:
+    enabled: true
+    replicas: 3
+    raft:
+      enabled: true
+      setNodeId: true
+      config: |
+        ui = true
+
+        listener "tcp" {
+          address         = "[::]:8200"
+          cluster_address = "[::]:8201"
+          tls_disable     = false
+          tls_cert_file   = "/vault/userconfig/vault-server-tls/tls.crt"
+          tls_key_file    = "/vault/userconfig/vault-server-tls/tls.key"
+          tls_client_ca_file = "/vault/userconfig/vault-server-tls/ca.crt"
+          tls_min_version = "tls13"
+        }
+
+        storage "raft" {
+          path = "/vault/data"
+          retry_join {
+            leader_api_addr = "https://vault-0.vault-internal:8200"
+            leader_ca_cert_file = "/vault/userconfig/vault-server-tls/ca.crt"
+          }
+          retry_join {
+            leader_api_addr = "https://vault-1.vault-internal:8200"
+            leader_ca_cert_file = "/vault/userconfig/vault-server-tls/ca.crt"
+          }
+          retry_join {
+            leader_api_addr = "https://vault-2.vault-internal:8200"
+            leader_ca_cert_file = "/vault/userconfig/vault-server-tls/ca.crt"
+          }
+        }
+
+        # Auto-unseal using Cloud KMS
+        seal "awskms" {
+          region     = "us-east-1"
+          kms_key_id = "arn:aws:kms:us-east-1:123456789012:key/vault-auto-unseal-key"
+        }
+
+        telemetry {
+          prometheus_retention_time = "30s"
+          disable_hostname          = true
+        }
+
+        service_registration "kubernetes" {}
+
+  # TLS Volume Mounts from cert-manager Secret
+  extraVolumes:
+    - type: "secret"
+      name: "vault-server-tls"
+
+  resources:
+    requests:
+      cpu: "500m"
+      memory: "1Gi"
+    limits:
+      cpu: "2000m"
+      memory: "4Gi"
+
+  # Hardened Linux Security Context (CIS Kubernetes Benchmark)
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 100
+    runAsGroup: 1000
+    fsGroup: 1000
+
+  containerSecurityContext:
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop:
+        - "ALL"
+      add:
+        - "IPC_LOCK"
+    readOnlyRootFilesystem: false
+
+  # High-Availability Pod Disruption Budget
+  disruptionBudget:
+    enabled: true
+    maxUnavailable: 1
+
+  # Multi-AZ Zone Anti-Affinity
+  affinity:
+    podAntiAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        - labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: "vault"
+              component: "server"
+          topologyKey: "topology.kubernetes.io/zone"
+
+  # Persistent Storage for Raft state
+  dataStorage:
+    enabled: true
+    size: "10Gi"
+    storageClass: "gp3-csi"
+    accessMode: "ReadWriteOnce"
+
+  # Audit Storage for immutable logging
+  auditStorage:
+    enabled: true
+    size: "20Gi"
+    storageClass: "gp3-csi"
+    accessMode: "ReadWriteOnce"

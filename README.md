@@ -1,13 +1,15 @@
 # DevOps & DevSecOps Engineering Skill
 
+[![Author: Reaan](https://img.shields.io/badge/Author-Reaan-blue.svg)](https://github.com/Reaan)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![CI](https://github.com/gentleman-programming/devops-skill/actions/workflows/ci.yml/badge.svg)](https://github.com/gentleman-programming/devops-skill/actions/workflows/ci.yml)
-[![Security Scan](https://github.com/gentleman-programming/devops-skill/actions/workflows/security-scan.yml/badge.svg)](https://github.com/gentleman-programming/devops-skill/actions/workflows/security-scan.yml)
+[![NPM Version](https://img.shields.io/npm/v/@reaan/devops-skill.svg)](https://www.npmjs.com/package/@reaan/devops-skill)
+[![CI](https://github.com/Reaan06/devops-skill/actions/workflows/ci.yml/badge.svg)](https://github.com/Reaan06/devops-skill/actions/workflows/ci.yml)
+[![Security Scan](https://github.com/Reaan06/devops-skill/actions/workflows/security-scan.yml/badge.svg)](https://github.com/Reaan06/devops-skill/actions/workflows/security-scan.yml)
 [![DevSecOps Trivy](https://img.shields.io/badge/Security-Trivy%20Gated-brightgreen.svg)](https://trivy.dev/)
 [![Supply Chain SLSA 3](https://img.shields.io/badge/Supply%20Chain-SLSA%20L3%20Ready-blueviolet.svg)](https://slsa.dev/)
 [![OpenTelemetry Ready](https://img.shields.io/badge/Observability-OpenTelemetry%20v1.30%2B-orange.svg)](https://opentelemetry.io/)
 
-Production-grade 2025/2026 DevOps and DevSecOps engineering skill for cloud-native systems. Covers container runtime hardening, production Kubernetes manifests with zero-trust network policies, immutable Infrastructure as Code with OpenTofu/Terraform, keyless OIDC CI/CD pipelines, GitOps reconciliation with ArgoCD, OpenTelemetry collector architectures, and end-to-end supply chain security.
+Production-grade 2025/2026 DevOps and DevSecOps engineering skill for cloud-native systems, authored by **Reaan**. Features universal multi-channel distribution across AI coding agents including Pi Coding Agent, Claude Code, Cursor, Windsurf, GitHub Copilot, and Open Standard agents. Covers container runtime hardening, production Kubernetes manifests with zero-trust network policies, immutable Infrastructure as Code with OpenTofu/Terraform, keyless OIDC CI/CD pipelines, GitOps reconciliation with ArgoCD, OpenTelemetry collector architectures, and end-to-end supply chain security.
 
 ---
 
@@ -25,6 +27,131 @@ Production-grade 2025/2026 DevOps and DevSecOps engineering skill for cloud-nati
 
 ---
 
+## Universal Installation
+
+`devops-skill` is distributed through three universal distribution channels to provide zero-friction installation across any AI agent environment, CLI, or CI/CD workflow:
+
+### Canal 1: Pi Coding Agent
+
+Pi Coding Agent features native package management and direct git/npm skill installation:
+
+- **Install via NPM package registry**:
+  ```bash
+  pi install npm:@reaan/devops-skill
+  ```
+
+- **Install directly via Git repository**:
+  ```bash
+  pi install git:github.com/Reaan06/devops-skill
+  ```
+
+- **Native Discovery**:
+  Pi automatically detects and registers the skill when placed in any of the standard discovery paths:
+  - Global agent skills standard: `~/.agents/skills/devops-skill`
+  - Pi user skills directory: `~/.pi/agent/skills/devops-skill`
+  - Project-local workspace: `.pi/skills/devops-skill`
+
+---
+
+### Canal 2: NPM / npx (Universal CLI)
+
+The `@reaan/devops-skill` package includes a cross-platform, zero-dependency CLI installer that configures all detected or targeted agents:
+
+- **Zero-Install Execution (`npx`)**:
+  Run directly without global installation. It automatically scans your environment, detects installed agents, and provisions skill assets:
+  ```bash
+  npx @reaan/devops-skill install
+  ```
+
+- **Global CLI Installation**:
+  Install globally for ongoing maintenance and batch operations:
+  ```bash
+  npm install -g @reaan/devops-skill
+  devops-skill install --all
+  ```
+
+- **Target Specific Agents**:
+  Selectively install to individual agent harnesses:
+  ```bash
+  devops-skill install --pi          # Pi Coding Agent
+  devops-skill install --claude      # Claude Code
+  devops-skill install --cursor      # Cursor IDE (.cursor/rules/)
+  devops-skill install --windsurf    # Windsurf IDE (.windsurf/rules/)
+  devops-skill install --copilot     # GitHub Copilot (.github/)
+  devops-skill install --agents      # Agent Skills open standard (~/.agents/skills/)
+  devops-skill install --all         # Provision all detected & supported agents
+  devops-skill install --target=pi,claude,cursor  # Comma-separated target list
+  ```
+
+- **Scope: Global vs Project Workspace**:
+  - `--global` (default): Deploys into user home directories (`~/.pi/agent/skills/`, `~/.claude/skills/`, `~/.agents/skills/`).
+  - `--project` / `-p`: Deploys rules and skills into the current project workspace (`.pi/skills/`, `.cursor/rules/`, `.windsurf/rules/`, `.github/`).
+  ```bash
+  # Deploy project-level Cursor rules and Copilot instructions
+  devops-skill install --cursor --copilot --project
+
+  # Deploy globally for Pi and Claude Code
+  devops-skill install --pi --claude --global
+  ```
+
+- **Local Development Symlink Mode (`--symlink` / `-l`)**:
+  When developing the skill locally from source, use symlink mode so modifications take effect immediately without re-copying:
+  ```bash
+  devops-skill install --all --symlink
+  ```
+
+- **Management Commands**:
+  ```bash
+  devops-skill install      # Install skill files to agents (default)
+  devops-skill uninstall    # Cleanly remove skill files and rules from agents
+  devops-skill list         # Show detected agent environments and installation status
+  devops-skill doctor       # Validate package integrity, templates, and reference guides
+  ```
+
+---
+
+### Canal 3: Curl Pipe (Zero-dependency POSIX)
+
+For minimal environments, containers, CI/CD runners, or developer machines without Node.js, the standalone POSIX `install.sh` script provides single-command installation:
+
+- **Interactive Auto-Detection**:
+  ```bash
+  curl -fsSL https://raw.githubusercontent.com/Reaan06/devops-skill/main/install.sh | bash
+  ```
+
+- **Install to All Agents Non-Interactively**:
+  Pass options directly via bash arguments (`bash -s -- <flags>`):
+  ```bash
+  curl -fsSL https://raw.githubusercontent.com/Reaan06/devops-skill/main/install.sh | bash -s -- --all
+  ```
+
+- **Target Specific Agents via Flag or List**:
+  ```bash
+  # Target comma-separated agents
+  curl -fsSL https://raw.githubusercontent.com/Reaan06/devops-skill/main/install.sh | bash -s -- --target=pi,claude
+
+  # Target individual agents with discrete flags and scope
+  curl -fsSL https://raw.githubusercontent.com/Reaan06/devops-skill/main/install.sh | bash -s -- --pi --cursor --project
+  ```
+
+---
+
+## Agent Compatibility Matrix
+
+`devops-skill` adapts to the native file format, rule protocol, and directory layout of each AI agent:
+
+| Agent / Harness | Global Target Path | Project Target Path | Format & Artifact Type | Activation & Discovery |
+| --- | --- | --- | --- | --- |
+| **Pi Coding Agent** | `~/.pi/agent/skills/devops-skill/` | `.pi/skills/devops-skill/` | Full skill tree (`SKILL.md`, `references/`, `templates/`, `scripts/`) | Native package manager (`pi install`), CLI, or prompt trigger |
+| **Claude Code** | `~/.claude/skills/devops-skill/` | `.claude/skills/devops-skill/` | Full skill tree with YAML metadata frontmatter | Native skill registration and contextual prompt triggers |
+| **Agent Skills Standard** | `~/.agents/skills/devops-skill/` | `.agents/skills/devops-skill/` | Open standard skill directory | Auto-indexed by standard-compliant harnesses |
+| **Cursor IDE** | *N/A (Workspace rule)* | `.cursor/rules/devops-skill.mdc` | MDC Rule with metadata frontmatter & file globs | Auto-applied on `Dockerfile*`, `*.tf`, `*.tofu`, `k8s/**/*.yaml` |
+| **Windsurf IDE** | *N/A (Workspace rule)* | `.windsurf/rules/devops-skill.md` | Cascade Rule markdown document | Auto-loaded in Windsurf Cascade workspace context |
+| **GitHub Copilot** | *N/A (Workspace rule)* | `.github/copilot-instructions.md` | Repository-wide custom instructions markdown | Loaded on all Copilot Chat and code completion interactions |
+| **OpenCode / Roo Code / Cline** | `~/.agents/skills/devops-skill/` or `~/.claude/skills/devops-skill/` | `.agents/skills/devops-skill/` | Open standard skill tree or system prompt reference | Indexed via standard agent path or prompt rule reference |
+
+---
+
 ## Directory Structure
 
 ```text
@@ -36,6 +163,10 @@ devops-skill/
 ├── SECURITY.md                       # Vulnerability disclosure and security policy
 ├── CONTRIBUTING.md                   # Engineering standards, linting, and PR workflow
 ├── CODE_OF_CONDUCT.md                # Community covenant code of conduct
+├── package.json                      # NPM package manifest & Pi package integration
+├── install.sh                        # Zero-dependency POSIX curl installer
+├── bin/
+│   └── cli.js                        # Cross-platform CLI installer (npx @reaan/devops-skill)
 ├── references/                       # In-depth architectural references & deep dives
 │   ├── 01-containers-runtime.md      # Container hardening, distroless, dive efficiency
 │   ├── 02-kubernetes-cloudnative.md  # K8s PSS Restricted, NetworkPolicies, QoS, HPA, PDB

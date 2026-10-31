@@ -1,0 +1,55 @@
+{
+  "name": "@reaan/devops-skill",
+  "version": "2.0.0",
+  "description": "Full-lifecycle 2025/2026 cloud-native DevOps & DevSecOps engineering skill for AI agents (Pi, Claude Code, Cursor, Windsurf, Roo, OpenCode)",
+  "main": "bin/cli.js",
+  "bin": {
+    "devops-skill": "./bin/cli.js"
+  },
+  "keywords": [
+    "pi-package",
+    "agent-skill",
+    "claude-skill",
+    "cursor-rules",
+    "devops",
+    "devsecops",
+    "kubernetes",
+    "docker",
+    "terraform",
+    "opentofu",
+    "argocd",
+    "opentelemetry",
+    "reaan"
+  ],
+  "author": "Reaan",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Reaan06/devops-skill.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Reaan06/devops-skill/issues"
+  },
+  "homepage": "https://github.com/Reaan06/devops-skill#readme",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "files": [
+    "bin/",
+    "references/",
+    "templates/",
+    "scripts/",
+    "SKILL.md",
+    "README.md",
+    "LICENSE"
+  ],
+  "pi": {
+    "skills": [
+      "."
+    ]
+  },
+  "scripts": {
+    "install-skill": "node bin/cli.js install",
+    "test": "node test/universal-install.test.js"
+  }
+}

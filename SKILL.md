@@ -3,7 +3,7 @@ name: devops-skill
 description: "Trigger: devops, docker, dockerfile, compose, kubernetes, k8s, helm, terraform, opentofu, iac, pipeline, github actions, ci/cd, gitops, argocd, devsecops, otel, opentelemetry, sre, deploy, despliegue, contenedor, infraestructura, trivy, cosign. Full-lifecycle 2025/2026 DevOps and DevSecOps engineering across containers, Kubernetes, IaC, CI/CD pipelines, GitOps, and observability."
 license: MIT
 metadata:
-  author: "gentleman-programming"
+  author: "Reaan"
   version: "2.0.0"
 ---
 

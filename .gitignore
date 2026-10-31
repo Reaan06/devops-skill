@@ -68,10 +68,16 @@ ENV/
 # Build and Binary Outputs
 dist/
 build/
-bin/
 *.exe
 *.out
 *.app
+
+# Local Agent Sandbox Directories
+.agents/
+.claude/
+.pi/
+.cursor/
+.windsurf/
 
 # Logs and Temporary Files
 *.log

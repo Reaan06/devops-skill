@@ -1,0 +1,93 @@
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: db-migration-flyway
+  namespace: production
+  labels:
+    app.kubernetes.io/name: db-migration-flyway
+    app.kubernetes.io/component: migration
+    app.kubernetes.io/part-of: payment-system
+  annotations:
+    argocd.argoproj.io/hook: PreSync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation,HookSucceeded
+    argocd.argoproj.io/sync-wave: "1"
+    helm.sh/hook: pre-install,pre-upgrade
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+    helm.sh/hook-weight: "1"
+spec:
+  backoffLimit: 2
+  activeDeadlineSeconds: 600
+  ttlSecondsAfterFinished: 3600
+  template:
+    metadata:
+      name: db-migration-flyway
+      labels:
+        app.kubernetes.io/name: db-migration-flyway
+        app.kubernetes.io/component: migration
+    spec:
+      restartPolicy: Never
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: flyway-migration
+          image: flyway/flyway:10.21.0-alpine
+          imagePullPolicy: IfNotPresent
+          command:
+            - flyway
+            - migrate
+          args:
+            - -connectRetries=10
+            - -connectRetriesInterval=5
+          env:
+            - name: FLYWAY_URL
+              valueFrom:
+                secretKeyRef:
+                  name: db-credentials
+                  key: DB_JDBC_URL
+            - name: FLYWAY_USER
+              valueFrom:
+                secretKeyRef:
+                  name: db-credentials
+                  key: DB_USER
+            - name: FLYWAY_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: db-credentials
+                  key: DB_PASSWORD
+            - name: FLYWAY_SCHEMAS
+              value: "public"
+            - name: FLYWAY_TABLE
+              value: "flyway_schema_history"
+            - name: FLYWAY_LOCATIONS
+              value: "filesystem:/flyway/sql"
+            - name: FLYWAY_BASELINE_ON_MIGRATE
+              value: "false"
+            - name: FLYWAY_VALIDATE_ON_MIGRATE
+              value: "true"
+          volumeMounts:
+            - name: migration-scripts
+              mountPath: /flyway/sql
+              readOnly: true
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          securityContext:
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+      volumes:
+        - name: migration-scripts
+          configMap:
+            name: db-migration-sql-scripts

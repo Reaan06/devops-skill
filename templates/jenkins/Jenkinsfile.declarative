@@ -1,0 +1,128 @@
+pipeline {
+    agent {
+        kubernetes {
+            yaml """
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    jenkins-agent: enterprise-builder
+spec:
+  serviceAccountName: jenkins-agent
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 10001
+    fsGroup: 10001
+  containers:
+    - name: jnlp
+      image: jenkins/inbound-agent:3283.v92c105e0f819-1
+      resources:
+        requests:
+          cpu: "250m"
+          memory: "512Mi"
+        limits:
+          cpu: "500m"
+          memory: "1Gi"
+    - name: node
+      image: node:22-bookworm-slim
+      command:
+        - sleep
+      args:
+        - 99d
+      resources:
+        requests:
+          cpu: "500m"
+          memory: "1Gi"
+        limits:
+          cpu: "2"
+          memory: "4Gi"
+    - name: kaniko
+      image: gcr.io/kaniko-project/executor:v1.23.2-debug
+      command:
+        - sleep
+      args:
+        - 99d
+      securityContext:
+        runAsUser: 0
+      resources:
+        requests:
+          cpu: "500m"
+          memory: "1Gi"
+        limits:
+          cpu: "2"
+          memory: "2Gi"
+    - name: helm
+      image: alpine/helm:3.17.0
+      command:
+        - sleep
+      args:
+        - 99d
+      resources:
+        requests:
+          cpu: "250m"
+          memory: "256Mi"
+        limits:
+          cpu: "500m"
+          memory: "512Mi"
+"""
+        }
+    }
+    environment {
+        APP_NAME = 'payment-service'
+        REGISTRY = 'registry.enterprise.internal'
+        IMAGE_TAG = "${env.BUILD_NUMBER}-${env.GIT_COMMIT.take(7)}"
+    }
+    options {
+        timeout(time: 30, unit: 'MINUTES')
+        buildDiscarder(logRotator(numToKeepStr: '20'))
+        disableConcurrentBuilds()
+    }
+    stages {
+        stage('Lint & Unit Test') {
+            steps {
+                container('node') {
+                    sh '''
+                        npm ci
+                        npm run lint
+                        npm test -- --coverage
+                    '''
+                }
+            }
+        }
+        stage('Container Build & Push') {
+            steps {
+                container('kaniko') {
+                    sh """
+                        /kaniko/executor \
+                          --context=dir://. \
+                          --dockerfile=Dockerfile \
+                          --destination=${REGISTRY}/${APP_NAME}:${IMAGE_TAG} \
+                          --destination=${REGISTRY}/${APP_NAME}:latest \
+                          --cache=true
+                    """
+                }
+            }
+        }
+        stage('Helm Lint & Template Validation') {
+            steps {
+                container('helm') {
+                    sh """
+                        helm lint ./deploy/helm/${APP_NAME}
+                        helm template test ./deploy/helm/${APP_NAME} --set image.tag=${IMAGE_TAG}
+                    """
+                }
+            }
+        }
+    }
+    post {
+        always {
+            cleanWs notFailBuild: true
+        }
+        failure {
+            echo "Pipeline failed for build ${env.BUILD_NUMBER}"
+        }
+        success {
+            echo "Pipeline succeeded for build ${env.BUILD_NUMBER}"
+        }
+    }
+}

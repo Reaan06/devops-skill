@@ -1,0 +1,39 @@
+---
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: GitRepository
+metadata:
+  name: fleet-infra
+  namespace: flux-system
+  labels:
+    app.kubernetes.io/part-of: fluxcd
+spec:
+  interval: 1m
+  url: https://github.com/enterprise-org/fleet-infra.git
+  ref:
+    branch: main
+  secretRef:
+    name: github-deploy-token
+  timeout: 60s
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: prod-workloads
+  namespace: flux-system
+  labels:
+    app.kubernetes.io/part-of: fluxcd
+spec:
+  interval: 5m
+  retryInterval: 1m
+  sourceRef:
+    kind: GitRepository
+    name: fleet-infra
+  path: ./clusters/production/workloads
+  prune: true
+  wait: true
+  timeout: 3m
+  healthChecks:
+    - apiVersion: apps/v1
+      kind: Deployment
+      name: payment-api
+      namespace: production

@@ -1,0 +1,121 @@
+---
+- name: Apply baseline OS hardening (CIS Level 1)
+  hosts: all
+  become: true
+  gather_facts: true
+
+  vars:
+    app_user: appuser
+    app_group: appgroup
+    app_uid: 10001
+    app_gid: 10001
+
+  tasks:
+    - name: Create unprivileged application system group
+      ansible.builtin.group:
+        name: "{{ app_group }}"
+        gid: "{{ app_gid }}"
+        system: true
+        state: present
+
+    - name: Create unprivileged application system user
+      ansible.builtin.user:
+        name: "{{ app_user }}"
+        uid: "{{ app_uid }}"
+        group: "{{ app_group }}"
+        system: true
+        shell: /sbin/nologin
+        create_home: false
+        state: present
+
+    - name: Enforce strict SSH daemon configuration
+      ansible.builtin.lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: "{{ item.regexp }}"
+        line: "{{ item.line }}"
+        state: present
+        validate: "/usr/sbin/sshd -t -f %s"
+      loop:
+        - regexp: "^#?PermitRootLogin"
+          line: "PermitRootLogin no"
+        - regexp: "^#?PasswordAuthentication"
+          line: "PasswordAuthentication no"
+        - regexp: "^#?X11Forwarding"
+          line: "X11Forwarding no"
+        - regexp: "^#?MaxAuthTries"
+          line: "MaxAuthTries 3"
+        - regexp: "^#?ClientAliveInterval"
+          line: "ClientAliveInterval 300"
+        - regexp: "^#?ClientAliveCountMax"
+          line: "ClientAliveCountMax 0"
+      notify: Restart sshd
+
+    - name: Configure sysctl network and kernel hardening parameters
+      ansible.posix.sysctl:
+        name: "{{ item.key }}"
+        value: "{{ item.value }}"
+        sysctl_set: true
+        state: present
+        reload: false
+      loop:
+        - key: net.ipv4.ip_forward
+          value: "0"
+        - key: net.ipv4.conf.all.send_redirects
+          value: "0"
+        - key: net.ipv4.conf.default.send_redirects
+          value: "0"
+        - key: net.ipv4.conf.all.accept_redirects
+          value: "0"
+        - key: net.ipv4.conf.default.accept_redirects
+          value: "0"
+        - key: net.ipv4.conf.all.secure_redirects
+          value: "0"
+        - key: net.ipv4.conf.all.rp_filter
+          value: "1"
+        - key: net.ipv4.conf.default.rp_filter
+          value: "1"
+        - key: net.ipv4.tcp_syncookies
+          value: "1"
+        - key: fs.protected_hardlinks
+          value: "1"
+        - key: fs.protected_symlinks
+          value: "1"
+        - key: kernel.randomize_va_space
+          value: "2"
+
+    - name: Ensure auditd service packages are installed
+      ansible.builtin.package:
+        name:
+          - audit
+          - audit-libs
+        state: present
+
+    - name: Enable and configure auditd daemon
+      ansible.builtin.service:
+        name: auditd
+        enabled: true
+        state: started
+
+    - name: Deploy baseline auditd rules
+      ansible.builtin.copy:
+        dest: /etc/audit/rules.d/99-baseline-hardening.rules
+        owner: root
+        group: root
+        mode: "0600"
+        content: |
+          # Audit changes to system time
+          -a always,exit -F arch=b64 -S adjtimex -S settimeofday -k time-change
+          # Audit modifications to accounts and passwords
+          -w /etc/passwd -p wa -k identity
+          -w /etc/shadow -p wa -k identity
+          -w /etc/group -p wa -k identity
+          # Audit changes to network configuration
+          -w /etc/sysconfig/network -p wa -k network-config
+          # Make audit configuration immutable
+          -e 2
+
+  handlers:
+    - name: Restart sshd
+      ansible.builtin.service:
+        name: sshd
+        state: restarted

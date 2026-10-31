@@ -1,5 +1,5 @@
 {
-  "name": "@reaan/devops-skill",
+  "name": "@reaan_dev/devops-skill",
   "version": "2.0.0",
   "description": "Full-lifecycle 2025/2026 cloud-native DevOps & DevSecOps engineering skill for AI agents (Pi, Claude Code, Cursor, Windsurf, Roo, OpenCode)",
   "main": "bin/cli.js",

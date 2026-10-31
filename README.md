@@ -2,7 +2,7 @@
 
 [![Author: Reaan](https://img.shields.io/badge/Author-Reaan-blue.svg)](https://github.com/Reaan)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![NPM Version](https://img.shields.io/npm/v/@reaan/devops-skill.svg)](https://www.npmjs.com/package/@reaan/devops-skill)
+[![NPM Version](https://img.shields.io/npm/v/@reaan_dev/devops-skill.svg)](https://www.npmjs.com/package/@reaan_dev/devops-skill)
 [![CI](https://github.com/Reaan06/devops-skill/actions/workflows/ci.yml/badge.svg)](https://github.com/Reaan06/devops-skill/actions/workflows/ci.yml)
 [![Security Scan](https://github.com/Reaan06/devops-skill/actions/workflows/security-scan.yml/badge.svg)](https://github.com/Reaan06/devops-skill/actions/workflows/security-scan.yml)
 [![DevSecOps Trivy](https://img.shields.io/badge/Security-Trivy%20Gated-brightgreen.svg)](https://trivy.dev/)
@@ -37,7 +37,7 @@ Pi Coding Agent features native package management and direct git/npm skill inst
 
 - **Install via NPM package registry**:
   ```bash
-  pi install npm:@reaan/devops-skill
+  pi install npm:@reaan_dev/devops-skill
   ```
 
 - **Install directly via Git repository**:
@@ -55,18 +55,18 @@ Pi Coding Agent features native package management and direct git/npm skill inst
 
 ### Canal 2: NPM / npx (Universal CLI)
 
-The `@reaan/devops-skill` package includes a cross-platform, zero-dependency CLI installer that configures all detected or targeted agents:
+The `@reaan_dev/devops-skill` package includes a cross-platform, zero-dependency CLI installer that configures all detected or targeted agents:
 
 - **Zero-Install Execution (`npx`)**:
   Run directly without global installation. It automatically scans your environment, detects installed agents, and provisions skill assets:
   ```bash
-  npx @reaan/devops-skill install
+  npx @reaan_dev/devops-skill install
   ```
 
 - **Global CLI Installation**:
   Install globally for ongoing maintenance and batch operations:
   ```bash
-  npm install -g @reaan/devops-skill
+  npm install -g @reaan_dev/devops-skill
   devops-skill install --all
   ```
 
@@ -166,7 +166,7 @@ devops-skill/
 ├── package.json                      # NPM package manifest & Pi package integration
 ├── install.sh                        # Zero-dependency POSIX curl installer
 ├── bin/
-│   └── cli.js                        # Cross-platform CLI installer (npx @reaan/devops-skill)
+│   └── cli.js                        # Cross-platform CLI installer (npx @reaan_dev/devops-skill)
 ├── references/                       # In-depth architectural references & deep dives
 │   ├── 01-containers-runtime.md      # Container hardening, distroless, dive efficiency
 │   ├── 02-kubernetes-cloudnative.md  # K8s PSS Restricted, NetworkPolicies, QoS, HPA, PDB

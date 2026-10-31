@@ -49,7 +49,7 @@ function printHelp() {
   printBanner();
   console.log(`
 Usage:
-  npx @reaan/devops-skill [command] [options]
+  npx @reaan_dev/devops-skill [command] [options]
   devops-skill [command] [options]
 
 Commands:
@@ -78,10 +78,10 @@ Scope & Behavior Options:
   --silent           Suppress non-error logs
 
 Examples:
-  npx @reaan/devops-skill install --all
-  npx @reaan/devops-skill install --pi --global
-  npx @reaan/devops-skill install --cursor --project
-  npx @reaan/devops-skill doctor
+  npx @reaan_dev/devops-skill install --all
+  npx @reaan_dev/devops-skill install --pi --global
+  npx @reaan_dev/devops-skill install --cursor --project
+  npx @reaan_dev/devops-skill doctor
 `);
 }
 

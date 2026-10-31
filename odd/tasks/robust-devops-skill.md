@@ -20,7 +20,7 @@ Tracking specification document for upgrading `devops-skill` into a Tier-1 Enter
 - T4 (linked S5): Implement root `Makefile` and `scripts/validate-all.sh`. [Commit: `8a719be`]
 - T5 (linked S6): Update `.github/workflows/ci.yml` and references/documentation. [Commit: `4e9ffef`]
 - T6 (linked S7): Verification and security audit via subagents.
-- T7: Commit, push to GitHub `main`, and register in persistent memory. [PR stack #1-#4 active, CI 100% PASS]
+- T7: Commit, push to GitHub `main`, and register in persistent memory. [PR stack #1-#4 merged into main, CI 100% PASS]
 
 ## Log
 
@@ -31,3 +31,4 @@ Tracking specification document for upgrading `devops-skill` into a Tier-1 Enter
 - L5: Tooling unificado (Makefile, validate-all.sh) y endurecimiento de CI.
 - L6: Auditoría de seguridad integral y remediación de vulnerabilidades.
 - L7: Desactivación de CodeRabbit vía .coderabbit.yaml y migración a contenedor oficial `docker://aquasec/trivy:0.60.0`. Todos los checks de CI en verde.
+- L8: Revisión integral de PRs #1, #2, #3 y #4; verificación de checks CI al 100% verdes y merge exitoso de toda la serie encadenada a `main`.

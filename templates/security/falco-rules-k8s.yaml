@@ -1,0 +1,89 @@
+# ==============================================================================
+# Production Falco Runtime Security Rules for Kubernetes
+# Detects:
+# 1. Interactive terminal shell execution inside running containers
+# 2. Unauthorized read access to sensitive system files and K8s service account tokens
+# 3. Modification or write attempts to system binary directories
+# ==============================================================================
+
+- list: shell_binaries
+  items:
+    - bash
+    - sh
+    - zsh
+    - ash
+    - csh
+    - ksh
+    - tcsh
+
+- list: sensitive_files
+  items:
+    - /etc/shadow
+    - /etc/sudoers
+    - /etc/pam.d
+    - /var/run/secrets/kubernetes.io/serviceaccount/token
+    - /root/.ssh
+    - /root/.aws/credentials
+
+- macro: container_event
+  condition: container.id != host
+
+- macro: interactive_shell
+  condition: >
+    (proc.name in (shell_binaries) or proc.pname in (shell_binaries))
+    and proc.tty != 0
+
+- macro: open_read
+  condition: (evt.type in (open, openat, openat2) and evt.is_open_read = true and fd.typechar = 'f')
+
+- macro: write_bin_dir
+  condition: >
+    (evt.type in (open, openat, openat2, creat) and evt.is_open_write = true)
+    and (fd.name startswith /bin/ or fd.name startswith /sbin/ or fd.name startswith /usr/bin/ or fd.name startswith /usr/sbin/)
+
+- rule: Interactive Terminal Shell Spawned in Container
+  desc: Detects an interactive shell session (bash, sh, zsh) initiated within a production container.
+  condition: container_event and interactive_shell and evt.type = execve
+  output: >
+    ALERT Interactive shell spawned in container
+    (user=%user.name user_loginuid=%user.loginuid pod=%k8s.pod.name ns=%k8s.ns.name
+    container_id=%container.id container_name=%container.name process=%proc.name
+    cmdline=%proc.cmdline parent=%proc.pname tty=%proc.tty image=%container.image.repository:%container.image.tag)
+  priority: WARNING
+  tags:
+    - container
+    - shell
+    - mitre_execution
+    - k8s
+    - T1059
+
+- rule: Sensitive File Read Access in Container
+  desc: Detects unauthorized processes reading sensitive OS credentials or Kubernetes service account tokens.
+  condition: container_event and open_read and fd.name in (sensitive_files)
+  output: >
+    CRITICAL Sensitive file read in container
+    (user=%user.name pod=%k8s.pod.name ns=%k8s.ns.name file=%fd.name
+    process=%proc.name cmdline=%proc.cmdline parent=%proc.pname
+    container_id=%container.id container_name=%container.name image=%container.image.repository)
+  priority: CRITICAL
+  tags:
+    - container
+    - credential_access
+    - mitre_credential_access
+    - k8s
+    - T1003
+
+- rule: File Write Below System Binary Directory
+  desc: Detects attempts to write or replace binaries in critical system paths (/bin, /sbin, /usr/bin).
+  condition: container_event and write_bin_dir
+  output: >
+    ERROR Write to system binary directory in container
+    (user=%user.name pod=%k8s.pod.name ns=%k8s.ns.name file=%fd.name
+    process=%proc.name cmdline=%proc.cmdline container_id=%container.id image=%container.image.repository)
+  priority: ERROR
+  tags:
+    - container
+    - persistence
+    - mitre_persistence
+    - k8s
+    - T1543

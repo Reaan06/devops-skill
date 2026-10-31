@@ -1,0 +1,86 @@
+name: Prowler CSPM Security & Compliance Audit
+
+on:
+  schedule:
+    # Run weekly cloud security audit every Sunday at 04:00 UTC
+    - cron: "0 4 * * 0"
+  workflow_dispatch:
+    inputs:
+      compliance_framework:
+        description: "Compliance framework to audit against (e.g. cis_3.0_aws, soc2_aws, pci_3.2.1_aws)"
+        required: false
+        default: "cis_3.0_aws"
+        type: string
+      severity:
+        description: "Severity levels to include in report"
+        required: false
+        default: "critical,high"
+        type: string
+
+permissions:
+  id-token: write
+  contents: read
+  security-events: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  prowler-cspm-audit:
+    name: Prowler Cloud Security Assessment
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository source
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials via OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_PROWLER_ROLE_ARN || 'arn:aws:iam::123456789012:role/github-actions-prowler-auditor' }}
+          role-session-name: prowler-cspm-audit-${{ github.run_id }}
+          aws-region: ${{ vars.AWS_REGION || 'us-east-1' }}
+
+      - name: Set up Python Environment
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install Prowler CSPM Tooling
+        run: |
+          python -m pip install --upgrade pip
+          pip install prowler
+
+      - name: Execute Prowler Compliance Audit
+        run: |
+          mkdir -p prowler-output
+          prowler aws \
+            --compliance "${{ inputs.compliance_framework || 'cis_3.0_aws' }}" \
+            --severity "${{ inputs.severity || 'critical,high' }}" \
+            --output-formats sarif,json-asff,html \
+            --output-directory prowler-output
+
+      - name: Locate SARIF Output Report
+        id: locate-sarif
+        run: |
+          SARIF_PATH=$(find prowler-output -name "*.sarif" | head -n 1)
+          if [ -n "${SARIF_PATH}" ]; then
+            echo "sarif_file=${SARIF_PATH}" >> "${GITHUB_OUTPUT}"
+          else
+            echo "sarif_file=" >> "${GITHUB_OUTPUT}"
+          fi
+
+      - name: Upload Prowler SARIF to GitHub Security Tab
+        uses: github/codeql-action/upload-sarif@v3
+        if: always() && steps.locate-sarif.outputs.sarif_file != ''
+        with:
+          sarif_file: ${{ steps.locate-sarif.outputs.sarif_file }}
+
+      - name: Archive Prowler HTML & JSON Audit Artifacts
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: prowler-audit-reports
+          path: prowler-output/
+          retention-days: 30

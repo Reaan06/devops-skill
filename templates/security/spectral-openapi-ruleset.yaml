@@ -1,0 +1,74 @@
+# ==============================================================================
+# Spectral OpenAPI Security Governance Ruleset
+# Enforces Contract-First API Security, OWASP API Top 10 Protections,
+# and RFC 7807 Standardized Error Envelopes.
+# ==============================================================================
+extends:
+  - "spectral:oas"
+
+rules:
+  # Enforce explicit security definitions across all API operations (OWASP API2:2023)
+  operation-security-defined:
+    description: "Every API operation must declare an explicit security requirement or formal public exemption."
+    message: "Operation '{{path}}' is missing a security definition."
+    severity: error
+    given: "$.paths.*[get,post,put,delete,patch]"
+    then:
+      field: security
+      defined: true
+
+  # Enforce TLS/HTTPS only on all API server endpoints (OWASP API8:2023)
+  servers-https-only:
+    description: "Server URLs must strictly utilize HTTPS to ensure encryption in transit."
+    message: "Server URL '{{value}}' must start with 'https://'."
+    severity: error
+    given: "$.servers[*].url"
+    then:
+      function: pattern
+      functionOptions:
+        match: "^https://"
+
+  # Prevent Mass Assignment by prohibiting arbitrary additional properties (OWASP API3:2023)
+  schema-no-additional-properties:
+    description: "Request and entity schemas must specify 'additionalProperties: false' to prevent Mass Assignment."
+    message: "Schema '{{property}}' must explicitly declare 'additionalProperties: false'."
+    severity: warn
+    given: "$.components.schemas[?(@.type === 'object')]"
+    then:
+      field: additionalProperties
+      defined: true
+      function: falsy
+
+  # Enforce RFC 7807 Problem Details on HTTP 4xx and 5xx error responses
+  rfc7807-error-responses:
+    description: "HTTP 4xx and 5xx responses must declare 'application/problem+json' or standardized error schema."
+    message: "Error response '{{path}}' must define content schema for client diagnostics."
+    severity: error
+    given: "$.paths.*[get,post,put,delete,patch].responses[?(@property >= 400 && @property < 600)]"
+    then:
+      field: content
+      defined: true
+
+  # Disallow insecure HTTP Basic Authentication
+  no-basic-authentication:
+    description: "HTTP Basic Authentication sends unencrypted base64 credentials and is prohibited."
+    message: "Security scheme '{{property}}' uses insecure Basic Auth."
+    severity: error
+    given: "$.components.securitySchemes[?(@.type === 'http')]"
+    then:
+      field: scheme
+      function: pattern
+      functionOptions:
+        notMatch: "^basic$"
+
+  # Enforce explicit descriptive summary and operationId for auditability
+  operation-audit-metadata:
+    description: "Each API operation must provide an operationId and summary for tracing and audit logging."
+    message: "Operation '{{path}}' is missing required audit metadata (operationId or summary)."
+    severity: warn
+    given: "$.paths.*[get,post,put,delete,patch]"
+    then:
+      - field: operationId
+        defined: true
+      - field: summary
+        defined: true

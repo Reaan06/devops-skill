@@ -1,0 +1,50 @@
+name: Nuclei DAST Vulnerability Scan
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_url:
+        description: "Target URL to execute DAST scan against (e.g. Staging environment)"
+        required: true
+        default: "https://staging.example.internal"
+        type: string
+      severity:
+        description: "Vulnerability severity filter (comma-separated: critical, high, medium, low)"
+        required: false
+        default: "critical,high,medium"
+        type: string
+  schedule:
+    # Run weekly DAST scan every Sunday at 02:00 UTC
+    - cron: "0 2 * * 0"
+
+permissions:
+  contents: read
+  security-events: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  nuclei-dast-scan:
+    name: Nuclei DAST Assessment
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository source
+        uses: actions/checkout@v4
+
+      - name: Run Nuclei DAST Vulnerability Scanner
+        uses: projectdiscovery/nuclei-action@v1.6.15
+        with:
+          target: ${{ inputs.target_url || 'https://staging.example.internal' }}
+          urls: ${{ inputs.target_url || 'https://staging.example.internal' }}
+          sarif-export: nuclei.sarif
+          output: nuclei.txt
+        env:
+          SEVERITY: ${{ inputs.severity || 'critical,high,medium' }}
+
+      - name: Upload Nuclei SARIF Results to GitHub Security
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: nuclei.sarif

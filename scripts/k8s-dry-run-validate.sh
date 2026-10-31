@@ -35,7 +35,7 @@ else
   echo "[INFO] Performing fallback YAML structure validation using Python..."
   python3 -c "
 import sys, glob, os
-path = '${TARGET_PATH}'
+path = sys.argv[1]
 files = [path] if os.path.isfile(path) else glob.glob(os.path.join(path, '**/*.y*ml'), recursive=True)
 if not files:
     print('[WARN] No YAML files found to validate.')
@@ -47,7 +47,7 @@ for f in files:
         print(f'[FAIL] {f} is missing standard Kubernetes apiVersion or kind fields.', file=sys.stderr)
         sys.exit(1)
     print(f'[PASS] {f} has valid Kubernetes object structure.')
-"
+" "${TARGET_PATH}"
 fi
 
 echo "======================================================================"

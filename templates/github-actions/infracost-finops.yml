@@ -1,0 +1,62 @@
+name: FinOps Shift-Left Cost Estimation
+
+on:
+  pull_request:
+    types:
+      - opened
+      - synchronize
+      - reopened
+    paths:
+      - "**.tf"
+      - "**.tfvars"
+      - "**/terragrunt.hcl"
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  infracost:
+    name: Infracost Cost Diff Assessment
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout PR branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Infracost CLI
+        uses: infracost/actions/setup@v3
+        with:
+          api-key: ${{ secrets.INFRACOST_API_KEY }}
+
+      - name: Checkout base branch for baseline comparison
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.ref }}
+          path: /tmp/base
+
+      - name: Generate Infracost baseline cost estimate
+        run: |
+          infracost breakdown --path=/tmp/base \
+                              --format=json \
+                              --out-file=/tmp/infracost-base.json
+
+      - name: Generate Infracost cost diff against baseline
+        run: |
+          infracost diff --path=. \
+                         --format=json \
+                         --compare-to=/tmp/infracost-base.json \
+                         --out-file=/tmp/infracost.json
+
+      - name: Post or update Infracost comment on PR
+        run: |
+          infracost comment github --path=/tmp/infracost.json \
+                                   --repo=${{ github.repository }} \
+                                   --github-token=${{ secrets.GITHUB_TOKEN }} \
+                                   --pull-request=${{ github.event.pull_request.number }} \
+                                   --behavior=update

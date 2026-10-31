@@ -1,0 +1,33 @@
+apiVersion: autoscaling.k8s.io/v1
+kind: VerticalPodAutoscaler
+metadata:
+  name: backend-api-vpa
+  namespace: production-apps
+  labels:
+    app.kubernetes.io/name: backend-api
+    app.kubernetes.io/instance: production
+    app.kubernetes.io/part-of: core-platform
+    app.kubernetes.io/component: vpa-advisor
+    app.kubernetes.io/managed-by: vpa
+spec:
+  targetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: backend-api
+  updatePolicy:
+    # "Off" runs VPA purely in recommendation mode without evicting or restarting pods
+    updateMode: "Off"
+  resourcePolicy:
+    containerPolicies:
+      - containerName: backend-api
+        mode: Auto
+        minAllowed:
+          cpu: 100m
+          memory: 128Mi
+        maxAllowed:
+          cpu: 4000m
+          memory: 8Gi
+        controlledResources:
+          - cpu
+          - memory
+        controlledValues: RequestsAndLimits

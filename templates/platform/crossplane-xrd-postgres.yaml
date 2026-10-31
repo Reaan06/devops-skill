@@ -1,0 +1,136 @@
+apiVersion: apiextensions.crossplane.io/v1
+kind: CompositeResourceDefinition
+metadata:
+  name: xpostgresqlinstances.database.platform.example.com
+  labels:
+    app.kubernetes.io/part-of: platform-engineering
+    app.kubernetes.io/component: control-plane
+    app.kubernetes.io/managed-by: crossplane
+spec:
+  group: database.platform.example.com
+  names:
+    kind: XPostgreSQLInstance
+    plural: xpostgresqlinstances
+  claimNames:
+    kind: PostgreSQLInstance
+    plural: postgresqlinstances
+  connectionSecretKeys:
+    - username
+    - password
+    - endpoint
+    - port
+    - database
+  versions:
+    - name: v1alpha1
+      served: true
+      referenceable: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          properties:
+            spec:
+              type: object
+              required:
+                - storageGB
+                - engineVersion
+              properties:
+                parameters:
+                  type: object
+                  properties:
+                    storageGB:
+                      type: integer
+                      minimum: 20
+                      maximum: 1000
+                      description: "Allocated storage capacity in Gigabytes (GP3 SSD)"
+                    engineVersion:
+                      type: string
+                      description: "PostgreSQL engine version, e.g. '16.2'"
+                      default: "16.2"
+                    tier:
+                      type: string
+                      enum:
+                        - small
+                        - medium
+                        - large
+                      default: small
+                      description: "Abstract compute tier mapped by composition to cloud-specific instance types"
+            status:
+              type: object
+              properties:
+                endpoint:
+                  type: string
+                  description: "Database connection endpoint hostname"
+                port:
+                  type: integer
+                  description: "Database connection port"
+                ready:
+                  type: boolean
+                  description: "Readiness state of the underlying managed database instance"
+---
+apiVersion: apiextensions.crossplane.io/v1
+kind: Composition
+metadata:
+  name: rds-postgres.database.platform.example.com
+  labels:
+    provider: aws
+    crossplane.io/xrd: xpostgresqlinstances.database.platform.example.com
+    app.kubernetes.io/part-of: platform-engineering
+    app.kubernetes.io/component: control-plane
+    app.kubernetes.io/managed-by: crossplane
+spec:
+  compositeTypeRef:
+    apiVersion: database.platform.example.com/v1alpha1
+    kind: XPostgreSQLInstance
+  resources:
+    - name: rds-instance
+      base:
+        apiVersion: rds.aws.upbound.io/v1beta1
+        kind: Instance
+        spec:
+          forProvider:
+            engine: postgres
+            engineVersion: "16.2"
+            allocatedStorage: 20
+            storageType: gp3
+            instanceClass: db.t4g.small
+            publiclyAccessible: false
+            skipFinalSnapshot: false
+            finalSnapshotIdentifier: "final-snapshot-db"
+            storageEncrypted: true
+            backupRetentionPeriod: 7
+            autoMinorVersionUpgrade: true
+            deletionProtection: true
+          writeConnectionSecretToRef:
+            namespace: crossplane-system
+      patches:
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.parameters.storageGB
+          toFieldPath: spec.forProvider.allocatedStorage
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.parameters.engineVersion
+          toFieldPath: spec.forProvider.engineVersion
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.parameters.tier
+          toFieldPath: spec.forProvider.instanceClass
+          transforms:
+            - type: map
+              map:
+                small: db.t4g.small
+                medium: db.m6g.large
+                large: db.r6g.xlarge
+        - type: FromCompositeFieldPath
+          fromFieldPath: metadata.labels[crossplane.io/claim-namespace]
+          toFieldPath: spec.writeConnectionSecretToRef.namespace
+        - type: FromCompositeFieldPath
+          fromFieldPath: metadata.labels[crossplane.io/claim-name]
+          toFieldPath: spec.writeConnectionSecretToRef.name
+          transforms:
+            - type: string
+              string:
+                fmt: "%s-conn-secret"
+        - type: ToCompositeFieldPath
+          fromFieldPath: status.atProvider.address
+          toFieldPath: status.endpoint
+        - type: ToCompositeFieldPath
+          fromFieldPath: status.atProvider.port
+          toFieldPath: status.port

@@ -1,0 +1,111 @@
+# ==============================================================================
+# OpenCost Production Helm Values (opencost/opencost)
+# Real-time Kubernetes cost allocation and cloud pricing telemetry
+# Configured for integration with kube-prometheus-stack
+# ==============================================================================
+
+global:
+  imageRegistry: ""
+  imagePullSecrets: []
+
+opencost:
+  exporter:
+    image:
+      registry: quay.io
+      repository: kubecost1/kubecost-cost-model
+      tag: prod-2.4.1
+      pullPolicy: IfNotPresent
+
+    # Configuration for Prometheus metric queries
+    defaultClusterId: "production-eks-us-east-1"
+
+    # Cloud Provider Pricing configuration
+    cloudProviderApiKey: ""
+    customPricing:
+      enabled: false
+      configmapName: "custom-pricing-model"
+
+    # Export Prometheus scraping metrics for OpenCost compute allocation
+    extraEnv:
+      PROMETHEUS_SERVER_ENDPOINT: "http://kube-prometheus-stack-prometheus.monitoring.svc.cluster.local:9090"
+      CLUSTER_ID: "production-eks-us-east-1"
+      LOG_LEVEL: "info"
+      EMIT_KSM_V1_METRICS: "false"
+      SHARED_NAMESPACES: "kube-system,monitoring,ingress-nginx,cert-manager"
+      SHARE_TENANCY_COSTS: "true"
+
+    resources:
+      requests:
+        cpu: "250m"
+        memory: "512Mi"
+      limits:
+        cpu: "1000m"
+        memory: "2Gi"
+
+    # Pod Security Standards (PSS) Restricted compliance
+    securityContext:
+      allowPrivilegeEscalation: false
+      readOnlyRootFilesystem: true
+      runAsNonRoot: true
+      runAsUser: 10001
+      runAsGroup: 10001
+      capabilities:
+        drop:
+          - ALL
+      seccompProfile:
+        type: RuntimeDefault
+
+  # Prometheus scrape and ServiceMonitor settings
+  prometheus:
+    internal:
+      enabled: false # Use external Prometheus from monitoring namespace
+    external:
+      url: "http://kube-prometheus-stack-prometheus.monitoring.svc.cluster.local:9090"
+
+  ui:
+    enabled: true
+    image:
+      registry: quay.io
+      repository: kubecost1/opencost-ui
+      tag: prod-2.4.1
+      pullPolicy: IfNotPresent
+    resources:
+      requests:
+        cpu: "100m"
+        memory: "128Mi"
+      limits:
+        cpu: "200m"
+        memory: "256Mi"
+    securityContext:
+      allowPrivilegeEscalation: false
+      readOnlyRootFilesystem: true
+      runAsNonRoot: true
+      runAsUser: 10001
+      runAsGroup: 10001
+      capabilities:
+        drop:
+          - ALL
+      seccompProfile:
+        type: RuntimeDefault
+
+# Prometheus Operator ServiceMonitor configuration
+serviceMonitor:
+  enabled: true
+  namespace: monitoring
+  interval: 30s
+  scrapeTimeout: 10s
+  honorLabels: true
+  additionalLabels:
+    release: kube-prometheus-stack
+    role: alert-rules
+  metricRelabelings: []
+
+# Pod Disruption Budget to guarantee continuous cost telemetry availability
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+serviceAccount:
+  create: true
+  annotations:
+    eks.amazonaws.com/role-arn: "arn:aws:iam::123456789012:role/opencost-pricing-access-role"

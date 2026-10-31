@@ -1,0 +1,129 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vllm-inference-server
+  namespace: ml-inference
+  labels:
+    app.kubernetes.io/name: vllm-inference-server
+    app.kubernetes.io/instance: production
+    app.kubernetes.io/part-of: llm-platform
+    app.kubernetes.io/component: inference-engine
+    app.kubernetes.io/managed-by: argocd
+spec:
+  replicas: 1
+  revisionHistoryLimit: 3
+  strategy:
+    type: Recreate # Recreate strategy prevents GPU resource oversubscription during rolling updates
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: vllm-inference-server
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: vllm-inference-server
+        app.kubernetes.io/instance: production
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8000"
+        prometheus.io/path: "/metrics"
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      nodeSelector:
+        nvidia.com/gpu.present: "true"
+      tolerations:
+        - key: "nvidia.com/gpu"
+          operator: "Exists"
+          effect: "NoSchedule"
+      containers:
+        - name: vllm-engine
+          image: vllm/vllm-openai:v0.6.3.post1
+          imagePullPolicy: IfNotPresent
+          command:
+            - python3
+            - -m
+            - vllm.entrypoints.openai.api_server
+          args:
+            - --model=mistralai/Mistral-7B-Instruct-v0.3
+            - --port=8000
+            - --host=0.0.0.0
+            - --tensor-parallel-size=1
+            - --max-model-len=8192
+            - --gpu-memory-utilization=0.90
+            - --download-dir=/models-cache
+            - --disable-log-requests
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: false # Model compilation and cache require write access
+            capabilities:
+              drop:
+                - ALL
+          env:
+            - name: HUGGING_FACE_HUB_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: hf-token-secret
+                  key: token
+                  optional: true
+            - name: NCCL_DEBUG
+              value: WARN
+            - name: VLLM_LOGGING_LEVEL
+              value: INFO
+          ports:
+            - name: http-inference
+              containerPort: 8000
+              protocol: TCP
+          resources:
+            requests:
+              cpu: "4"
+              memory: "16Gi"
+              nvidia.com/gpu: "1"
+            limits:
+              cpu: "8"
+              memory: "32Gi"
+              nvidia.com/gpu: "1"
+          startupProbe:
+            httpGet:
+              path: /health
+              port: http-inference
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 30 # Up to 5 minutes for large weight loading
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http-inference
+            initialDelaySeconds: 10
+            periodSeconds: 15
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http-inference
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 2
+          volumeMounts:
+            - name: dshm
+              mountPath: /dev/shm
+            - name: models-cache
+              mountPath: /models-cache
+      volumes:
+        # /dev/shm shared memory size is critical for PyTorch CUDA IPC and NCCL communication
+        - name: dshm
+          emptyDir:
+            medium: Memory
+            sizeLimit: 4Gi
+        - name: models-cache
+          emptyDir:
+            sizeLimit: 50Gi

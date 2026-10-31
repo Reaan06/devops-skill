@@ -267,7 +267,10 @@ if [ "$EXPLICIT_TARGETS" -eq 0 ]; then
   TARGET_AGENTS=1
 
   if [ "$SCOPE" = "global" ]; then
-    if [ -d "$HOME/.pi" ]; then TARGET_PI=1; fi
+    # In global scope, Pi automatically discovers skills located in ~/.agents/skills.
+    # Installing simultaneously into ~/.pi/agent/skills and ~/.agents/skills triggers
+    # a Pi skill collision warning. Only target ~/.pi if explicitly requested via --pi.
+    TARGET_PI=0
     if [ -d "$HOME/.claude" ]; then TARGET_CLAUDE=1; fi
     if [ -d "$HOME/.cursor" ] || [ -d "$PWD/.cursor" ]; then TARGET_CURSOR=1; fi
     if [ -d "$HOME/.windsurf" ] || [ -d "$PWD/.windsurf" ]; then TARGET_WINDSURF=1; fi
@@ -478,6 +481,15 @@ EOF
 
   rm -f "$tmp_block" 2>/dev/null || true
 }
+
+# Prevent collision in global scope: if installing to ~/.agents/skills and not explicitly targeting pi,
+# clean redundant skill directory in ~/.pi/agent/skills to prevent collision
+if [ "$SCOPE" = "global" ] && [ "$TARGET_AGENTS" -eq 1 ] && [ "$TARGET_PI" -eq 0 ]; then
+  if [ -e "$HOME/.pi/agent/skills/$SKILL_NAME" ] || [ -L "$HOME/.pi/agent/skills/$SKILL_NAME" ]; then
+    printf "%b\n" "${DIM}  🧹 Removing redundant Pi skill at $HOME/.pi/agent/skills/$SKILL_NAME to prevent collision...${RESET}"
+    rm -rf "$HOME/.pi/agent/skills/$SKILL_NAME"
+  fi
+fi
 
 # Execute installation for selected targets
 if [ "$TARGET_PI" -eq 1 ]; then

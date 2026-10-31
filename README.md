@@ -36,11 +36,13 @@ Production-grade 2025/2026 DevOps and DevSecOps engineering skill for cloud-nati
 Pi Coding Agent features native package management and direct git/npm skill installation:
 
 - **Install via NPM package registry**:
+
   ```bash
   pi install npm:@reaan_dev/devops-skill
   ```
 
 - **Install directly via Git repository**:
+
   ```bash
   pi install git:github.com/Reaan06/devops-skill
   ```
@@ -59,12 +61,14 @@ The `@reaan_dev/devops-skill` package includes a cross-platform, zero-dependency
 
 - **Zero-Install Execution (`npx`)**:
   Run directly without global installation. It automatically scans your environment, detects installed agents, and provisions skill assets:
+
   ```bash
   npx @reaan_dev/devops-skill install
   ```
 
 - **Global CLI Installation**:
   Install globally for ongoing maintenance and batch operations:
+
   ```bash
   npm install -g @reaan_dev/devops-skill
   devops-skill install --all
@@ -72,6 +76,7 @@ The `@reaan_dev/devops-skill` package includes a cross-platform, zero-dependency
 
 - **Target Specific Agents**:
   Selectively install to individual agent harnesses:
+
   ```bash
   devops-skill install --pi          # Pi Coding Agent
   devops-skill install --claude      # Claude Code
@@ -86,6 +91,7 @@ The `@reaan_dev/devops-skill` package includes a cross-platform, zero-dependency
 - **Scope: Global vs Project Workspace**:
   - `--global` (default): Deploys into user home directories (`~/.pi/agent/skills/`, `~/.claude/skills/`, `~/.agents/skills/`).
   - `--project` / `-p`: Deploys rules and skills into the current project workspace (`.pi/skills/`, `.cursor/rules/`, `.windsurf/rules/`, `.github/`).
+
   ```bash
   # Deploy project-level Cursor rules and Copilot instructions
   devops-skill install --cursor --copilot --project
@@ -96,11 +102,13 @@ The `@reaan_dev/devops-skill` package includes a cross-platform, zero-dependency
 
 - **Local Development Symlink Mode (`--symlink` / `-l`)**:
   When developing the skill locally from source, use symlink mode so modifications take effect immediately without re-copying:
+
   ```bash
   devops-skill install --all --symlink
   ```
 
 - **Management Commands**:
+
   ```bash
   devops-skill install      # Install skill files to agents (default)
   devops-skill uninstall    # Cleanly remove skill files and rules from agents
@@ -115,17 +123,20 @@ The `@reaan_dev/devops-skill` package includes a cross-platform, zero-dependency
 For minimal environments, containers, CI/CD runners, or developer machines without Node.js, the standalone POSIX `install.sh` script provides single-command installation:
 
 - **Interactive Auto-Detection**:
+
   ```bash
   curl -fsSL https://raw.githubusercontent.com/Reaan06/devops-skill/main/install.sh | bash
   ```
 
 - **Install to All Agents Non-Interactively**:
   Pass options directly via bash arguments (`bash -s -- <flags>`):
+
   ```bash
   curl -fsSL https://raw.githubusercontent.com/Reaan06/devops-skill/main/install.sh | bash -s -- --all
   ```
 
 - **Target Specific Agents via Flag or List**:
+
   ```bash
   # Target comma-separated agents
   curl -fsSL https://raw.githubusercontent.com/Reaan06/devops-skill/main/install.sh | bash -s -- --target=pi,claude

@@ -10,7 +10,7 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 
-const VERSION = '2.0.0';
+const VERSION = '1.0.0';
 const SKILL_NAME = 'devops-skill';
 
 const ROOT_DIR = path.resolve(__dirname, '..');
@@ -463,11 +463,30 @@ function runInstall(options) {
 
     Object.entries(defs).forEach(([k, def]) => {
       if (k !== 'agents' && fs.existsSync(def.detectBase)) {
+        // Pi natively discovers skills from ~/.agents/skills.
+        // In global scope, installing into both ~/.pi/agent/skills and ~/.agents/skills causes
+        // a Pi skill collision warning. Skip redundant 'pi' when 'agents' is targeted.
+        if (options.scope === 'global' && k === 'pi' && targetsToInstall.includes('agents')) {
+          return;
+        }
         targetsToInstall.push(k);
       }
     });
 
     log(`Auto-detected active agent environments: ${targetsToInstall.join(', ')}`, colors.dim);
+  }
+
+  // Prevent collision in global scope: if installing to ~/.agents/skills and not explicitly targeting pi,
+  // ensure no duplicate skill directory in ~/.pi/agent/skills exists to trigger collision
+  if (options.scope === 'global' && targetsToInstall.includes('agents') && !options.targets.has('pi') && !options.all) {
+    const redundantPiSkill = path.join(getHomeDir(), '.pi', 'agent', 'skills', SKILL_NAME);
+    if (fs.existsSync(redundantPiSkill)) {
+      log(`\n🧹 Resolving Pi skill collision: removing redundant ${redundantPiSkill}...`, colors.yellow);
+      if (!options.dryRun) {
+        fs.rmSync(redundantPiSkill, { recursive: true, force: true });
+        log(`  ✓ Redundant Pi skill removed; Pi will load from ~/.agents/skills without conflict`, colors.green);
+      }
+    }
   }
 
   let hasFailures = false;

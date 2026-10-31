@@ -168,6 +168,29 @@ describe('Universal Installation Regression Tests', () => {
     assert.strictEqual(fs.existsSync(copilotInst), false, 'Copilot instruction should be removed');
   });
 
+  it('CLI auto-detection avoids redundant ~/.pi skill collision when agents standard is targeted', () => {
+    const fakeHome = fs.mkdtempSync(path.join(os.tmpdir(), 'home-mock-'));
+    fs.mkdirSync(path.join(fakeHome, '.pi'), { recursive: true });
+    // Pre-create an old duplicate in ~/.pi/agent/skills/devops-skill
+    const oldPiSkill = path.join(fakeHome, '.pi', 'agent', 'skills', 'devops-skill');
+    fs.mkdirSync(oldPiSkill, { recursive: true });
+    fs.writeFileSync(path.join(oldPiSkill, 'SKILL.md'), '# Old Duplicate');
+
+    const res = spawnSync('node', [CLI_PATH, 'install', '--global'], {
+      cwd: tmpSandbox,
+      env: { ...process.env, HOME: fakeHome, USERPROFILE: fakeHome },
+      encoding: 'utf8',
+    });
+    assert.strictEqual(res.status, 0, `CLI auto install failed: ${res.stderr}`);
+
+    const agentsSkill = path.join(fakeHome, '.agents', 'skills', 'devops-skill');
+    assert.strictEqual(fs.existsSync(path.join(agentsSkill, 'SKILL.md')), true);
+    // Redundant Pi skill should have been cleaned up to prevent Pi skill collision
+    assert.strictEqual(fs.existsSync(oldPiSkill), false);
+
+    fs.rmSync(fakeHome, { recursive: true, force: true });
+  });
+
   it('POSIX install.sh installs all agents cleanly in isolated environment', () => {
     const res = spawnSync('sh', [SH_PATH, '--all', '--project'], {
       cwd: tmpSandbox,

@@ -1,0 +1,9 @@
+**/.terraform/
+**/.terraform/**
+**/.terraform.lock.hcl
+test/
+odd/
+.atl/
+.github/
+*.tgz
+.DS_Store

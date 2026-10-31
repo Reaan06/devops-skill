@@ -247,3 +247,166 @@ To guarantee zero-downtime rolling updates, configure all three health probe typ
 1. **Startup Probe**: Gates liveness and readiness during slow application boot-up (e.g., warming caches or running DB migrations). Prevents premature kills.
 2. **Liveness Probe**: Detects deadlocks where the process is running but cannot recover. Triggers container restart.
 3. **Readiness Probe**: Determines when the pod is ready to accept incoming traffic from the Service endpoint controller. If readiness fails, endpoints are removed immediately without restarting the pod.
+
+---
+
+## 8. Enterprise Helm Chart Architecture
+
+Packaging applications for Kubernetes requires strict validation, security defaults, and modular template design.
+
+### 8.1 Schema-First Validation (`values.schema.json`)
+
+Enterprise charts MUST provide a JSON Schema draft-07 (`values.schema.json`) that validates types, constraints, and required fields before rendering. This catches misconfigurations in CI pipelines before deployment to clusters:
+
+- Requires non-root execution (`runAsNonRoot: true`, `runAsUser >= 1000`).
+- Enforces capability dropping (`drop: ["ALL"]`).
+- Validates ports (1-65535) and protocol enumerations.
+- Enforces Guaranteed QoS (requests and limits must both be provided).
+
+### 8.2 PSS-Restricted Security Contexts
+
+The default `values.yaml` MUST configure Pod Security Standards Restricted profile out of the box:
+
+```yaml
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 10001
+  runAsGroup: 10001
+  fsGroup: 10001
+  seccompProfile:
+    type: RuntimeDefault
+
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop:
+      - ALL
+```
+
+When `readOnlyRootFilesystem: true` is enabled, an ephemeral memory-backed volume (`emptyDir: medium: Memory`) must be mounted to `/tmp` for writable scratch space.
+
+### 8.3 Template Modularity and Named Helpers (`_helpers.tpl`)
+
+Standardized labels (`helm.sh/chart`, `app.kubernetes.io/name`, `app.kubernetes.io/instance`, `app.kubernetes.io/version`, `app.kubernetes.io/managed-by`) ensure consistent observability and GitOps tracking across all manifests.
+
+---
+
+## 9. Declarative GitOps with Kustomize
+
+Kustomize provides template-free, declarative configuration customization through layers:
+
+### 9.1 Base and Overlays Pattern
+
+- **`base/`**: Holds canonical, environment-agnostic resource definitions satisfying PSS Restricted and Guaranteed QoS.
+- **`overlays/staging/`**: Applies non-production customizations (e.g. single replica, `staging-` prefix, staging namespace) via strategic merge patches.
+- **`overlays/production/`**: Enforces high-availability controls, including `HorizontalPodAutoscaler` (minReplicas: 3, maxReplicas: 10), multi-zone affinity, and production namespaces.
+
+```text
+kustomize/
+├── base/
+│   ├── deployment.yaml
+│   ├── service.yaml
+│   └── kustomization.yaml
+└── overlays/
+    ├── staging/
+    │   ├── kustomization.yaml
+    │   └── replica-patch.yaml
+    └── production/
+        ├── kustomization.yaml
+        └── hpa-patch.yaml
+```
+
+---
+
+## 10. Next-Generation Ingress: Kubernetes Gateway API
+
+The **Gateway API** (`gateway.networking.k8s.io/v1`) succeeds the legacy `Ingress` API by establishing role-oriented, expressive, and extensible Layer 4 - Layer 7 routing:
+
+1. **Infrastructure Provider**: Manages `GatewayClass` (e.g., Envoy Gateway, Cilium, Istio).
+2. **Cluster Operator**: Manages `Gateway` instances defining entry points (ports, protocols, TLS certificates).
+3. **Application Developer**: Authors `HTTPRoute`, `GRPCRoute`, or `TCPRoute` attached to Gateways via `parentRefs`.
+
+### 10.1 Advanced Traffic Routing & Header Filtering
+
+`HTTPRoute` supports native request header modification, URL rewriting, traffic splitting (canary releases), and path matching without vendor-specific ingress annotations:
+
+```yaml
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: backend-api-route
+  namespace: production-apps
+spec:
+  parentRefs:
+    - name: enterprise-gateway
+      sectionName: https
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /api/v1
+      filters:
+        - type: RequestHeaderModifier
+          requestHeaderModifier:
+            set:
+              - name: X-Gateway-Routed
+                value: "true"
+      backendRefs:
+        - name: backend-api
+          port: 80
+          weight: 100
+```
+
+---
+
+## 11. Automated TLS Certificate Management with cert-manager
+
+Production workloads require automated certificate issuance, validation, and zero-downtime rotation.
+
+### 11.1 ACME Challenge Types
+
+- **HTTP-01 Challenge**: Solves validation by exposing a temporary cryptographic challenge token over HTTP on port 80 via the Ingress controller. Suitable for public single-domain and multi-domain certificates.
+- **DNS-01 Challenge**: Solves validation by creating dynamic `_acme-challenge` TXT records in the authoritative DNS provider (e.g., AWS Route53, Cloudflare). **Mandatory** for wildcard certificates (`*.example.com`) and private/internal clusters unreachable from the public internet.
+
+### 11.2 ClusterIssuer Strategy
+
+Maintain separate `ClusterIssuer` resources for staging and production:
+- `letsencrypt-staging`: Validates configuration without risking production rate limits (5 failed orders per account per hour).
+- `letsencrypt-prod`: Emits trusted browser-root certificates for production endpoints.
+
+---
+
+## 12. SRE Alerting & SLO Multi-Window Multi-Burn-Rate Rules
+
+Traditional static threshold alerts suffer from high false-positive rates during low traffic and delayed detection during severe outages.
+
+Following the **Google Site Reliability Engineering (SRE) Workbook**, multi-window multi-burn-rate alerting computes the rate of error budget consumption against the Service Level Objective (SLO):
+
+### 12.1 Mathematical Basis for SLO 99.9%
+
+- **Availability SLO**: 99.9% ($1 - 0.001 = 0.999$)
+- **Monthly Error Budget**: 0.1% of all requests can fail.
+- **Burn Rate 14.4x (Critical / Page)**: Depletes 2% of the monthly error budget in 1 hour. Requires short window (5m) and long window (1h) to both exceed $14.4 \times (1 - \text{SLO})$.
+- **Burn Rate 6.0x (Warning / Ticket)**: Depletes 5% of the monthly error budget in 6 hours. Requires short window (30m) and long window (6h) to both exceed $6.0 \times (1 - \text{SLO})$.
+
+### 12.2 Workload Golden Signals & Pod Health
+
+In addition to SLO burn rates, `PrometheusRule` manifests must track:
+- **`KubePodCrashLooping`**: Rapid restart rates indicating configuration or panic failures.
+- **`ContainerOOMKilled`**: Pod termination due to memory limit breaches (Exit Code 137).
+- **`KubeContainerWaiting`**: Containers stuck in `CrashLoopBackOff`, `ImagePullBackOff`, or `ErrImagePull`.
+- **Latency P99**: 99th percentile response time exceeding latency SLA thresholds (> 500ms).
+
+---
+
+## 13. Zero-Trust Secrets Management with External Secrets Operator
+
+Storing secrets in plain text or base64 within Git repositories violates DevSecOps compliance. The **External Secrets Operator (ESO)** bridges external enterprise secret managers with native Kubernetes secrets.
+
+### 13.1 Architecture Overview
+
+1. **`ClusterSecretStore`**: Cluster-wide resource configuring connection and authentication to external vaults (AWS Secrets Manager via IRSA, HashiCorp Vault via Kubernetes service account authentication).
+2. **`ExternalSecret`**: Namespaced custom resource defining which remote keys to fetch, target secret name, and synchronization interval (`refreshInterval: 1h`).
+3. **Native `Secret`**: Decoupled, automatically generated and rotated native Kubernetes Secret consumed by Pod environment variables and volume mounts.
+

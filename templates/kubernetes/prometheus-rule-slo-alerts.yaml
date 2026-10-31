@@ -1,0 +1,133 @@
+# ==============================================================================
+# Prometheus Operator PrometheusRule: Multi-Window Multi-Burn-Rate SLO Alerts
+# Target Availability SLO: 99.9% (Error Budget: 0.1%)
+# Reference: Google Site Reliability Engineering Workbook (Chapter 5)
+# ==============================================================================
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: platform-slo-and-workload-alerts
+  namespace: monitoring
+  labels:
+    role: alert-rules
+    prometheus: kube-prometheus
+    app.kubernetes.io/part-of: kube-prometheus-stack
+spec:
+  groups:
+    - name: slo-availability-99.9
+      rules:
+        # ----------------------------------------------------------------------
+        # Critical Alert: 1h / 5m burn rate > 14.4 (consumes 2% error budget in 1h)
+        # Multi-window multi-burn-rate requires both short and long windows to trigger
+        # ----------------------------------------------------------------------
+        - alert: AvailabilitySLOHighBurnRateCritical
+          expr: |
+            (
+              sum(rate(http_requests_total{status=~"5.."}[1h])) by (job, namespace, service)
+              /
+              sum(rate(http_requests_total[1h])) by (job, namespace, service)
+              > (1 - 0.999) * 14.4
+            )
+            and
+            (
+              sum(rate(http_requests_total{status=~"5.."}[5m])) by (job, namespace, service)
+              /
+              sum(rate(http_requests_total[5m])) by (job, namespace, service)
+              > (1 - 0.999) * 14.4
+            )
+          for: 2m
+          labels:
+            severity: critical
+            tier: tier-1
+            slo: availability
+          annotations:
+            summary: "Service {{ $labels.service }} is burning error budget at 14.4x rate (SLO 99.9%)"
+            description: "High error rate observed in namespace {{ $labels.namespace }}. At this rate, 2% of the monthly error budget will be depleted within 1 hour."
+            runbook_url: "https://wiki.example.com/runbooks/slo-availability"
+
+        # ----------------------------------------------------------------------
+        # Warning Alert: 6h / 30m burn rate > 6.0 (consumes 5% error budget in 6h)
+        # ----------------------------------------------------------------------
+        - alert: AvailabilitySLOWarningBurnRate
+          expr: |
+            (
+              sum(rate(http_requests_total{status=~"5.."}[6h])) by (job, namespace, service)
+              /
+              sum(rate(http_requests_total[6h])) by (job, namespace, service)
+              > (1 - 0.999) * 6.0
+            )
+            and
+            (
+              sum(rate(http_requests_total{status=~"5.."}[30m])) by (job, namespace, service)
+              /
+              sum(rate(http_requests_total[30m])) by (job, namespace, service)
+              > (1 - 0.999) * 6.0
+            )
+          for: 15m
+          labels:
+            severity: warning
+            tier: tier-1
+            slo: availability
+          annotations:
+            summary: "Service {{ $labels.service }} is burning error budget at 6x rate (SLO 99.9%)"
+            description: "Elevated error rate observed in namespace {{ $labels.namespace }}. At this rate, 5% of the monthly error budget will be depleted within 6 hours."
+            runbook_url: "https://wiki.example.com/runbooks/slo-availability"
+
+        # ----------------------------------------------------------------------
+        # Latency Alert: P99 Latency > 500ms over a 5m window
+        # ----------------------------------------------------------------------
+        - alert: HighRequestLatencyP99
+          expr: |
+            histogram_quantile(0.99,
+              sum(rate(http_request_duration_seconds_bucket[5m])) by (le, job, namespace, service)
+            ) > 0.5
+          for: 5m
+          labels:
+            severity: warning
+            tier: tier-1
+            slo: latency
+          annotations:
+            summary: "P99 latency exceeds 500ms for service {{ $labels.service }}"
+            description: "Service {{ $labels.service }} in namespace {{ $labels.namespace }} has a P99 response time above 500ms (value: {{ $value | humanizeDuration }})."
+            runbook_url: "https://wiki.example.com/runbooks/high-latency"
+
+    # --------------------------------------------------------------------------
+    # Workload & Pod Health Alerts
+    # --------------------------------------------------------------------------
+    - name: kubernetes-workload-health
+      rules:
+        - alert: KubePodCrashLooping
+          expr: |
+            rate(kube_pod_container_status_restarts_total[5m]) * 60 > 0.2
+          for: 5m
+          labels:
+            severity: critical
+            tier: platform
+          annotations:
+            summary: "Pod {{ $labels.pod }} is crash looping"
+            description: "Pod {{ $labels.pod }} in namespace {{ $labels.namespace }} (container: {{ $labels.container }}) is restarting frequently (>0.2 restarts per minute)."
+            runbook_url: "https://wiki.example.com/runbooks/pod-crashlooping"
+
+        - alert: ContainerOOMKilled
+          expr: |
+            kube_pod_container_status_terminated_reason{reason="OOMKilled"} == 1
+          for: 0m
+          labels:
+            severity: critical
+            tier: platform
+          annotations:
+            summary: "Container {{ $labels.container }} in pod {{ $labels.pod }} was OOM killed"
+            description: "Container {{ $labels.container }} inside pod {{ $labels.pod }} (namespace: {{ $labels.namespace }}) exceeded its memory limit and was terminated with SIGKILL (Exit code 137)."
+            runbook_url: "https://wiki.example.com/runbooks/container-oom"
+
+        - alert: KubeContainerWaiting
+          expr: |
+            kube_pod_container_status_waiting_reason{reason=~"CrashLoopBackOff|ImagePullBackOff|ErrImagePull"} == 1
+          for: 15m
+          labels:
+            severity: warning
+            tier: platform
+          annotations:
+            summary: "Container {{ $labels.container }} waiting due to {{ $labels.reason }}"
+            description: "Container {{ $labels.container }} inside pod {{ $labels.pod }} (namespace: {{ $labels.namespace }}) has been trapped in waiting state for more than 15 minutes due to {{ $labels.reason }}."
+            runbook_url: "https://wiki.example.com/runbooks/container-waiting"

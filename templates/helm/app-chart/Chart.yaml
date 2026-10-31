@@ -1,0 +1,15 @@
+apiVersion: v2
+name: app-chart
+description: Enterprise-grade Helm Chart enforcing PSS Restricted, Guaranteed QoS, and Zero-Trust Network Policies
+type: application
+version: 1.0.0
+appVersion: "1.0.0"
+keywords:
+  - kubernetes
+  - cloud-native
+  - security
+  - pss-restricted
+  - enterprise
+maintainers:
+  - name: DevOps Engineering Team
+    email: devops@example.com

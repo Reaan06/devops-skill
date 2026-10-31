@@ -29,6 +29,7 @@ Production-grade 2025/2026 DevOps and DevSecOps engineering skill for cloud-nati
 
 ```text
 devops-skill/
+├── Makefile                          # Unified orchestration targets (lint, validate, scan, fmt)
 ├── SKILL.md                          # Main skill specification & agent execution contract
 ├── README.md                         # Project documentation and onboarding
 ├── LICENSE                           # MIT open-source license
@@ -44,13 +45,51 @@ devops-skill/
 │   ├── 06-devsecops-supply-chain.md  # Syft SBOMs, Trivy CVE gating, Gitleaks, SLSA L3
 │   └── 07-oss-governance-standards.md# Diátaxis docs, PR etiquette, quality gates
 ├── templates/                        # Battle-tested production templates
-│   ├── containers/                   # Hardened Dockerfiles, compose, and .dockerignore
-│   ├── kubernetes/                   # Production manifests (Deployment, Ingress, NetPol, HPA, PDB)
-│   ├── terraform/                    # Root module, variables, outputs, and backend config
-│   ├── github-actions/               # OIDC authentication, container build/push, Trivy/Gitleaks
-│   ├── gitops/                       # ArgoCD declarative application definitions
+│   ├── containers/                   # Hardened multi-stage Dockerfiles & compose
+│   │   ├── Dockerfile.distroless.go  # Go 1.23 CGO-free static binary on gcr.io/distroless/static:nonroot
+│   │   ├── Dockerfile.distroless.rust# Rust cargo-chef musl static binary on distroless/static:nonroot
+│   │   ├── Dockerfile.slim.node      # Node.js 22 LTS Debian Bookworm-slim with pnpm and dumb-init
+│   │   ├── Dockerfile.standalone.nextjs # Next.js 15 standalone output with non-root nextjs:nodejs
+│   │   ├── Dockerfile.slim.python    # Python 3.12 slim with virtualenv isolation and wheel builder
+│   │   ├── Dockerfile.temurin21.java # Java 21 Eclipse Temurin with layered JAR extraction and cgroups v2
+│   │   ├── compose.hardened.yaml     # Hardened Docker Compose specification (read-only rootfs, cap drops)
+│   │   └── .dockerignore             # Enterprise zero-leak build context exclusions
+│   ├── kubernetes/                   # Core production manifests & Day-2 operations
+│   │   ├── deployment-hardened.yaml  # PSS Restricted Deployment with non-root user and read-only rootfs
+│   │   ├── service-ingress.yaml      # ClusterIP Service and TLS Ingress with security annotations
+│   │   ├── network-policy-default-deny.yaml # Default-deny ingress/egress network isolation
+│   │   ├── hpa-v2.yaml               # HorizontalPodAutoscaler v2 with CPU/Memory/Prometheus metrics
+│   │   ├── pdb.yaml                  # PodDisruptionBudget with minAvailable protection
+│   │   ├── cert-manager-cluster-issuer.yaml # ACME Let's Encrypt HTTP-01 and Route53 DNS-01 ClusterIssuers
+│   │   ├── external-secrets-operator.yaml # AWS Secrets Manager & HashiCorp Vault ClusterSecretStore
+│   │   ├── gateway-api-httproute.yaml# Gateway API Gateway and HTTPRoute traffic routing definitions
+│   │   └── prometheus-rule-slo-alerts.yaml # Multi-window multi-burn-rate SLO alerting rules
+│   ├── helm/                         # Enterprise Helm Chart packaging
+│   │   └── app-chart/                # Production chart with values.schema.json, PSS templates, and helpers
+│   ├── kustomize/                    # GitOps environment overlay architecture
+│   │   ├── base/                     # Reusable foundational manifests (Deployment, Service, kustomization)
+│   │   └── overlays/                 # Environment-specific patches
+│   │       ├── staging/              # Staging overlay (replicas, ingress hosts, config maps)
+│   │       └── production/           # Production overlay (HA replicas, strict resources, PDB)
+│   ├── terraform/                    # Multi-cloud remote state & root baseline modules
+│   │   ├── backend-s3-dynamodb.tf    # AWS S3 KMS-encrypted state bucket with DynamoDB LockID table
+│   │   ├── backend-gcs.tf            # GCP GCS CMEK-encrypted state bucket with precondition locking
+│   │   ├── backend-azurerm.tf        # Azure Storage CMK with Key Vault and native Blob lease locking
+│   │   ├── opentofu-state-encryption.tf # OpenTofu 1.8+ native client-side PBKDF2/KMS state & plan encryption
+│   │   ├── main.tf                   # Multi-AZ VPC network baseline with private/public subnets
+│   │   ├── variables.tf              # Strongly-typed input variables with validation rules
+│   │   ├── outputs.tf                # Secure output contracts
+│   │   └── versions.tf               # Version and provider constraint declarations
+│   ├── github-actions/               # Enterprise CI/CD workflow blueprints
+│   │   ├── oidc-aws-auth.yml         # Keyless AWS authentication via GitHub Actions OIDC token
+│   │   ├── ci-docker-build-push.yml  # Multi-arch BuildKit compilation, Cosign signing, and SLSA provenance
+│   │   ├── gitleaks-trivy-scan.yml   # Shift-left secret detection and container vulnerability scanner
+│   │   ├── checkov-iac-scan.yml      # Static IaC policy and compliance scanner with SARIF export
+│   │   └── infracost-finops.yml      # Automated pull request cloud infrastructure cost assessment
+│   ├── gitops/                       # Declarative ArgoCD GitOps application manifests
 │   └── observability/                # OpenTelemetry collector configuration and JSON log spec
 └── scripts/                          # Reusable verification and auditing scripts
+    ├── validate-all.sh               # Unified cascading validation suite with Docker fallbacks
     ├── audit-image.sh                # Container image efficiency and layer analysis via dive
     ├── scan-secrets.sh               # Git repository secret leak scanning via gitleaks
     └── k8s-dry-run-validate.sh       # Client-side Kubernetes manifest syntax & schema validator

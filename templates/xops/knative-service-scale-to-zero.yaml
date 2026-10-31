@@ -1,0 +1,77 @@
+---
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: order-processing-service
+  namespace: serverless-apps
+  labels:
+    app.kubernetes.io/name: order-processing-service
+    app.kubernetes.io/part-of: ecommerce-platform
+    app.kubernetes.io/managed-by: gitops
+spec:
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: order-processing-service
+      annotations:
+        # Autoscaler Configuration (KPA - Knative Pod Autoscaler)
+        autoscaling.knative.dev/class: "kpa.autoscaling.knative.dev"
+        autoscaling.knative.dev/metric: "concurrency"
+        autoscaling.knative.dev/target: "10" # Target 10 concurrent requests per container instance
+        autoscaling.knative.dev/target-utilization-percentage: "70" # Trigger scale-up at 70% of target (7 concurrent requests)
+        autoscaling.knative.dev/min-scale: "0" # Enables true scale-to-zero when idle
+        autoscaling.knative.dev/max-scale: "50" # Protects backend datastores from connection exhaustion
+        autoscaling.knative.dev/window: "60s" # Stable window evaluation period
+        autoscaling.knative.dev/panic-window-percentage: "10.0" # Fast burst detection window (6s)
+        autoscaling.knative.dev/panic-threshold-percentage: "200.0" # Switches to panic mode if concurrency reaches 2x target
+    spec:
+      containerConcurrency: 20 # Hard ceiling: queue-proxy rejects / buffers above 20 concurrent requests
+      timeoutSeconds: 300 # Maximum request execution time
+      containers:
+        - name: order-processor
+          image: ghcr.io/my-org/order-processing-service:v2.4.0
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http1
+              containerPort: 8080
+              protocol: TCP
+          env:
+            - name: APP_ENV
+              value: "production"
+            - name: LOG_LEVEL
+              value: "info"
+            - name: PORT
+              value: "8080"
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "256Mi"
+            limits:
+              cpu: "1000m"
+              memory: "512Mi"
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 10001
+            runAsGroup: 10001
+            capabilities:
+              drop:
+                - ALL
+            seccompProfile:
+              type: RuntimeDefault
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http1
+            periodSeconds: 3
+            timeoutSeconds: 2
+            failureThreshold: 3
+          volumeMounts:
+            - name: ephemeral-tmp
+              mountPath: /tmp
+      volumes:
+        - name: ephemeral-tmp
+          emptyDir:
+            medium: Memory
+            sizeLimit: 64Mi

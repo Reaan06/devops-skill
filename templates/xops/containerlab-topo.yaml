@@ -1,0 +1,70 @@
+---
+name: spine-leaf-ci
+
+mgmt:
+  network: clab-mgmt
+  ipv4-subnet: 172.20.20.0/24
+
+topology:
+  kinds:
+    linux:
+      image: alpine:3.21
+    frr:
+      image: frrouting/frr:v9.1.0
+
+  nodes:
+    # -------------------------------------------------------------
+    # Spine Routers (BGP Route Reflectors / Fabric Core)
+    # -------------------------------------------------------------
+    spine1:
+      kind: frr
+      mgmt-ipv4: 172.20.20.11
+      startup-config: configs/spine1.vtysh
+
+    spine2:
+      kind: frr
+      mgmt-ipv4: 172.20.20.12
+      startup-config: configs/spine2.vtysh
+
+    # -------------------------------------------------------------
+    # Leaf Routers (Top-of-Rack / Edge Switches)
+    # -------------------------------------------------------------
+    leaf1:
+      kind: frr
+      mgmt-ipv4: 172.20.20.21
+      startup-config: configs/leaf1.vtysh
+
+    leaf2:
+      kind: frr
+      mgmt-ipv4: 172.20.20.22
+      startup-config: configs/leaf2.vtysh
+
+    # -------------------------------------------------------------
+    # Workload Verification Clients
+    # -------------------------------------------------------------
+    client1:
+      kind: linux
+      mgmt-ipv4: 172.20.20.31
+      exec:
+        - ip addr add 192.168.10.10/24 dev eth1
+        - ip route add 192.168.0.0/16 via 192.168.10.1
+
+    client2:
+      kind: linux
+      mgmt-ipv4: 172.20.20.32
+      exec:
+        - ip addr add 192.168.20.10/24 dev eth1
+        - ip route add 192.168.0.0/16 via 192.168.20.1
+
+  links:
+    # Fabric Interconnects: Spine1 to Leafs
+    - endpoints: ["spine1:eth1", "leaf1:eth1"]
+    - endpoints: ["spine1:eth2", "leaf2:eth1"]
+
+    # Fabric Interconnects: Spine2 to Leafs
+    - endpoints: ["spine2:eth1", "leaf1:eth2"]
+    - endpoints: ["spine2:eth2", "leaf2:eth2"]
+
+    # Edge Access Links: Leaf to Client
+    - endpoints: ["leaf1:eth3", "client1:eth1"]
+    - endpoints: ["leaf2:eth3", "client2:eth1"]

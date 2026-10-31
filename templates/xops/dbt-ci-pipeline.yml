@@ -1,0 +1,96 @@
+---
+name: DataOps dbt Slim CI Pipeline
+
+on:
+  pull_request:
+    branches:
+      - main
+      - master
+    paths:
+      - 'models/**'
+      - 'seeds/**'
+      - 'snapshots/**'
+      - 'tests/**'
+      - 'macros/**'
+      - 'dbt_project.yml'
+      - 'packages.yml'
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: dbt-ci-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  dbt-slim-ci:
+    name: Run dbt Slim CI & Schema Verification
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+
+    env:
+      DBT_PROFILES_DIR: ./
+      PR_SCHEMA: dbt_pr_${{ github.event.pull_request.number }}
+      DBT_ENV_SECRET_WAREHOUSE_PASSWORD: ${{ secrets.DBT_STAGING_WAREHOUSE_PASSWORD }}
+
+    steps:
+      - name: Checkout PR Branch
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dbt and Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install dbt-core==1.8.2 dbt-postgres==1.8.2
+
+      - name: Cache dbt Dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.dbt/packages
+            dbt_packages
+          key: dbt-packages-${{ hashFiles('packages.yml', 'dbt_project.yml') }}
+          restore-keys: |
+            dbt-packages-
+
+      - name: Install dbt Package Dependencies
+        run: |
+          dbt deps
+
+      - name: Download Production Manifest Artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p ./state_prod
+          # Fetch manifest.json artifact generated from the latest production master run
+          gh run download --name dbt-production-manifest --dir ./state_prod || {
+            echo "Production manifest not found; compiling fallback state baseline..."
+            dbt compile --target prod --target-path ./state_prod
+          }
+
+      - name: Run dbt Slim CI (Modified Models & Tests with Deferral)
+        env:
+          DBT_SCHEMA: ${{ env.PR_SCHEMA }}
+        run: |
+          echo "Executing Slim CI against ephemeral schema: ${PR_SCHEMA}"
+          # Build only modified models and their first-order children; defer unbuilt parents to production
+          dbt build \
+            --select state:modified+ \
+            --defer \
+            --state ./state_prod \
+            --target ci \
+            --vars "{\"is_ci\": true, \"pr_schema\": \"${PR_SCHEMA}\"}"
+
+      - name: Cleanup Ephemeral PR Schema
+        if: always()
+        env:
+          DBT_SCHEMA: ${{ env.PR_SCHEMA }}
+        run: |
+          echo "Tearing down ephemeral PR schema: ${PR_SCHEMA}"
+          dbt run-operation drop_schema_if_exists --args "{\"schema_name\": \"${PR_SCHEMA}\"}" || true

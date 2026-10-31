@@ -76,45 +76,23 @@ jobs:
 
       - name: Set up HashiCorp Terraform
         uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_wrapper: false
 
       - name: Set up OpenTofu
         uses: opentofu/setup-opentofu@v1
+        with:
+          tofu_wrapper: false
 
       - name: Terraform Format Check
-        run: terraform fmt -check -diff templates/terraform
+        run: tofu fmt -check -diff templates/terraform
 
-      - name: Terraform Init and Validate
+      - name: Terraform & OpenTofu Init and Validate
+        env:
+          TF_VAR_state_passphrase: "dummy-passphrase-must-be-16-chars-minimum"
         run: |
-          # Intelligent CLI shim ensuring cross-compatibility with OpenTofu 1.8+ client-side encryption
-          cat << 'EOF' > /tmp/tf-wrapper
-          #!/usr/bin/env bash
-          args=()
-          dir=""
-          cmd_seen=false
-          for a in "$@"; do
-            if [[ "$a" == "init" || "$a" == "validate" ]]; then
-              cmd_seen=true
-              args+=("$a")
-            elif [[ "$cmd_seen" == "true" && -d "$a" ]]; then
-              dir="$a"
-            else
-              args+=("$a")
-            fi
-          done
-          binary="tofu"
-          if ! command -v tofu >/dev/null 2>&1; then
-            binary="terraform"
-          fi
-          if [[ -n "$dir" ]]; then
-            exec "$binary" -chdir="$dir" "${args[@]}"
-          else
-            exec "$binary" "${args[@]}"
-          fi
-          EOF
-          chmod +x /tmp/tf-wrapper
-          sudo cp /tmp/tf-wrapper /usr/local/bin/terraform
-
-          terraform init -backend=false templates/terraform && terraform validate templates/terraform
+          tofu -chdir=templates/terraform init -backend=false
+          tofu -chdir=templates/terraform validate
 
   kubeconform:
     name: Validate Kubernetes Manifests

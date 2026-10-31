@@ -14,14 +14,20 @@ Tracking specification document for upgrading `devops-skill` into a Tier-1 Enter
 
 ## Tasks
 
-- T1 (linked S1): Implement Rust, Java 21, and Next.js Dockerfiles in `templates/containers/`.
-- T2 (linked S2, S3): Implement Helm Chart, Kustomize overlays, PrometheusRule, ClusterIssuer, Gateway API, and ESO templates.
-- T3 (linked S4): Implement GCP & Azure IaC backends, OpenTofu native encryption, and Infracost/Checkov workflow.
-- T4 (linked S5): Implement root `Makefile` and `scripts/validate-all.sh`.
-- T5 (linked S6): Update `.github/workflows/ci.yml` and references/documentation.
+- T1 (linked S1): Implement Rust, Java 21, and Next.js Dockerfiles in `templates/containers/`. [Commit: `5efdf0d`]
+- T2 (linked S2, S3): Implement Helm Chart, Kustomize overlays, PrometheusRule, ClusterIssuer, Gateway API, and ESO templates. [Commit: `f909dc0`]
+- T3 (linked S4): Implement GCP & Azure IaC backends, OpenTofu native encryption, and Infracost/Checkov workflow. [Commit: `b1cfb69`]
+- T4 (linked S5): Implement root `Makefile` and `scripts/validate-all.sh`. [Commit: `8a719be`]
+- T5 (linked S6): Update `.github/workflows/ci.yml` and references/documentation. [Commit: `4e9ffef`]
 - T6 (linked S7): Verification and security audit via subagents.
-- T7: Commit, push to GitHub `main`, and register in persistent memory.
+- T7: Commit, push to GitHub `main`, and register in persistent memory. [PR stack #1-#4 active, CI 100% PASS]
 
 ## Log
 
 - L1: User requested a plan to implement all phases and integrate the complete package to make `devops-skill` as robust as possible.
+- L2: Implementación de runtimes de contenedores enterprise (Rust, Java 21, Next.js).
+- L3: Implementación de Helm chart, Kustomize base/overlays y manifiestos Day-2 K8s.
+- L4: Implementación de backends multi-cloud (GCS, Azure Blob), OpenTofu state encryption y FinOps/Checkov.
+- L5: Tooling unificado (Makefile, validate-all.sh) y endurecimiento de CI.
+- L6: Auditoría de seguridad integral y remediación de vulnerabilidades.
+- L7: Desactivación de CodeRabbit vía .coderabbit.yaml y migración a contenedor oficial `docker://aquasec/trivy:0.60.0`. Todos los checks de CI en verde.

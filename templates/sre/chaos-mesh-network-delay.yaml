@@ -1,0 +1,69 @@
+# ==============================================================================
+# Chaos Mesh NetworkChaos CRD (chaos-mesh.org/v1alpha1)
+# Injects controlled network latency, jitter, and packet loss
+# Designed for staging resilience validation and GameDay simulations
+# ==============================================================================
+---
+apiVersion: chaos-mesh.org/v1alpha1
+kind: NetworkChaos
+metadata:
+  name: service-network-delay
+  namespace: production-apps
+  labels:
+    app.kubernetes.io/name: service-network-delay
+    app.kubernetes.io/part-of: chaos-engineering
+    app.kubernetes.io/managed-by: chaos-mesh
+spec:
+  # Action to inject: delay, loss, corrupt, duplicate, partition, or bandwidth
+  action: delay
+  mode: fixed
+  value: "2" # Number of pods to affect concurrently
+  selector:
+    namespaces:
+      - production-apps
+    labelSelectors:
+      app.kubernetes.io/name: backend-api
+  delay:
+    latency: "120ms"
+    jitter: "20ms"
+    correlation: "25"
+  direction: to # Direction of traffic affected: to, from, or both
+  target:
+    mode: all
+    selector:
+      namespaces:
+        - production-apps
+      labelSelectors:
+        app.kubernetes.io/name: payment-service
+  duration: "10m" # Duration of fault injection window
+---
+apiVersion: chaos-mesh.org/v1alpha1
+kind: NetworkChaos
+metadata:
+  name: service-packet-loss
+  namespace: production-apps
+  labels:
+    app.kubernetes.io/name: service-packet-loss
+    app.kubernetes.io/part-of: chaos-engineering
+    app.kubernetes.io/managed-by: chaos-mesh
+spec:
+  # Injects random packet loss to evaluate TCP retransmission & timeout handling
+  action: loss
+  mode: all # Affects all matching pods within the selector
+  selector:
+    namespaces:
+      - production-apps
+    labelSelectors:
+      app.kubernetes.io/name: backend-api
+  loss:
+    loss: "15" # 15% packet loss percentage
+    correlation: "25"
+  direction: both
+  target:
+    mode: all
+    selector:
+      namespaces:
+        - production-apps
+      labelSelectors:
+        app.kubernetes.io/name: database-proxy
+  duration: "5m"
